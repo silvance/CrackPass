@@ -44,6 +44,7 @@ add_executable(hashcat-gui WIN32
     src/widgetstateserializer.h
     src/widgetstateserializer.cpp
     src/resources.qrc
+    src/hashcat-gui.rc
     src/aboutdialog.ui
     src/mainwindow.ui
     src/settingsdialog.ui
