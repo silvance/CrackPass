@@ -88,13 +88,13 @@ QFuture<HashcatResult> HelperUtils::executeHashcat(const QStringList &args, int 
         proc.start();
 
         if (!proc.waitForStarted()) {
-            result.standardError = "Failed to start hashcat";
+            result.standardError = "Failed to start hashcat\n" + proc.errorString();
             return result;
         }
 
         if (!proc.waitForFinished(timeoutMs)) {
             proc.kill();
-            result.standardError = "hashcat timed out";
+            result.standardError = "hashcat timed out\n" + proc.errorString();
             return result;
         }
 
