@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=hashcat-gui
+Comment=Qt-based GUI for hashcat
+Exec=hashcat-gui
+#Icon=hashcat-gui
+Terminal=false
+Categories=Utility;Security;
