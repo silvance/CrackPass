@@ -80,9 +80,6 @@ private:
 
     QStringList generateArguments();
 
-    void addWordlistItem(QStringList &);
-    void setOutfilePath();
-
     QString defaultProfileFile() const;
     void loadDefaultProfile();
     void saveDefaultProfile();
