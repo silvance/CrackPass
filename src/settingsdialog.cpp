@@ -34,8 +34,8 @@ void SettingsDialog::readSettings()
     ui->lineEdit_hc_path->setText(settings.getKey<QString>("hashcatPath"));
 
     // available terminals
-    QMap<QString, QStringList> availableTermins = HelperUtils::getAvailableTerminals();
-    ui->comboBox_terminal->addItems(availableTermins.keys());
+    QMap<QString, QStringList> availableTerminals = HelperUtils::getAvailableTerminals();
+    ui->comboBox_terminal->addItems(availableTerminals.keys());
 
     // terminal from saved settings
     ui->comboBox_terminal->setCurrentIndex(ui->comboBox_terminal->findText(settings.getKey<QString>("terminal")));
