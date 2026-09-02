@@ -1,0 +1,28 @@
+items:
+  - q: "Where are application settings stored?"
+    a: |
+      Application settings are stored using [QSettings::NativeFormat](https://doc.qt.io/qt-6/qsettings.html#Format-enum).
+
+      | **Operating System** | **Location** |
+      |-----------|-------------------------------------|
+      | Linux     | ~/.config/hashcat-gui/settings.conf |
+      | Windows   | HKEY_CURRENT_USER\Software\hashcat-gui\settings |
+  - q: "Where is the default profile saved?"
+    a: |
+      The default profile is saved at [QStandardPaths::AppDataLocation](https://doc.qt.io/qt-6/qstandardpaths.html#StandardLocation-enum).
+
+      | **Operating System** | **Location** |
+      |-----------|-------------------------------------|
+      | Linux     | ~/.local/share/hashcat-gui/default_profile.json |
+      | Windows   | %APPDATA%\hashcat-gui\default_profile.json |
+  - q: "Why does reading hash types time out on Windows?"
+    a: |
+      Windows Defender real-time protection can significantly delay the process of retrieving hash types. To resolve this, add an exclusion for the hashcat process.
+      Open PowerShell as an administrator and run
+
+      ```
+      Add-MpPreference -ExclusionProcess 'C:\path\to\hashcat.exe'
+      ```
+
+      *Note: Ensure you use the correct path to the hashcat executable, not the GUI.
+      Alternatively, you can temporarily disable Windows Defender real-time protection.*
