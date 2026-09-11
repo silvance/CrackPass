@@ -1,0 +1,18 @@
+# Unit tests for the non-UI forensic core. Each file is a self-contained
+# QtTest executable registered with CTest.
+
+set(FORENSIC_TESTS
+    test_hashingservice
+    test_artifactanalyzer
+    test_extractorregistry
+    test_auditlog
+    test_caseworkspace
+    test_datamodels
+)
+
+foreach(test_name ${FORENSIC_TESTS})
+    add_executable(${test_name} ${test_name}.cpp)
+    target_link_libraries(${test_name} PRIVATE forensic_core Qt6::Core Qt6::Test)
+    target_compile_options(${test_name} PRIVATE -Wall -Wextra)
+    add_test(NAME ${test_name} COMMAND ${test_name})
+endforeach()
