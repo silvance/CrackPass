@@ -41,10 +41,21 @@ add_library(forensic_core STATIC
     src/forensic/artifactanalyzerregistry.h
     src/forensic/artifactanalyzerregistry.cpp
     src/forensic/hashextractor.h
-    src/forensic/builtinextractors.h
-    src/forensic/builtinextractors.cpp
     src/forensic/extractorregistry.h
     src/forensic/extractorregistry.cpp
+    src/forensic/extraction/hashcatmodes.h
+    src/forensic/extraction/moderesolution.h
+    src/forensic/extraction/moderesolution.cpp
+    src/forensic/extraction/processrunner.h
+    src/forensic/extraction/processrunner.cpp
+    src/forensic/extraction/toolresolver.h
+    src/forensic/extraction/encryptionprobe.h
+    src/forensic/extraction/encryptionprobe.cpp
+    src/forensic/extraction/john2hashextractor.h
+    src/forensic/extraction/john2hashextractor.cpp
+    src/forensic/extraction/johnextractors.h
+    src/forensic/extraction/extraction.h
+    src/forensic/extraction/extraction.cpp
     src/forensic/hashingservice.h
     src/forensic/hashingservice.cpp
     src/forensic/jsonutil.h

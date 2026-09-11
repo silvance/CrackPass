@@ -8,6 +8,10 @@ set(FORENSIC_TESTS
     test_auditlog
     test_caseworkspace
     test_datamodels
+    test_moderesolution
+    test_encryptionprobe
+    test_johnextractors
+    test_extractionservice
 )
 
 foreach(test_name ${FORENSIC_TESTS})

@@ -3,7 +3,7 @@
  * SPDX-FileCopyrightText: CrackPass contributors
  */
 #include "extractorregistry.h"
-#include "builtinextractors.h"
+#include "extraction/johnextractors.h"
 
 namespace forensic {
 
@@ -32,18 +32,14 @@ bool ExtractorRegistry::hasExtractorFor(const ArtifactType &type) const
 ExtractorRegistry ExtractorRegistry::withBuiltins()
 {
     ExtractorRegistry registry;
-    // Declared extractors: types they will handle + target hashcat mode.
-    // extract() is not implemented yet; these exist so the UI and planner can
-    // reason about coverage.
-    registry.registerExtractor(std::make_shared<DeclaredHashExtractor>(
-        QStringLiteral("pdf-extractor"), QStringLiteral("PDF (office/pdf2hashcat)"),
-        QSet<QString>{QStringLiteral("pdf")}, 10500));
-    registry.registerExtractor(std::make_shared<DeclaredHashExtractor>(
-        QStringLiteral("keepass-extractor"), QStringLiteral("KeePass (keepass2hashcat)"),
-        QSet<QString>{QStringLiteral("keepass-kdbx")}, 13400));
-    registry.registerExtractor(std::make_shared<DeclaredHashExtractor>(
-        QStringLiteral("sevenzip-extractor"), QStringLiteral("7-Zip (7z2hashcat)"),
-        QSet<QString>{QStringLiteral("7z")}, 11600));
+    // One adapter per supported artifact/extractor type. New formats are added
+    // here (or via registerExtractor) with no change to the extraction workflow.
+    registry.registerExtractor(std::make_shared<OfficeHashExtractor>());
+    registry.registerExtractor(std::make_shared<PdfHashExtractor>());
+    registry.registerExtractor(std::make_shared<ZipHashExtractor>());
+    registry.registerExtractor(std::make_shared<RarHashExtractor>());
+    registry.registerExtractor(std::make_shared<SevenZipHashExtractor>());
+    registry.registerExtractor(std::make_shared<KeePassHashExtractor>());
     return registry;
 }
 
