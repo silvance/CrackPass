@@ -33,6 +33,7 @@ private slots:
     void openCase();
     void addArtifact();
     void extractSelected();
+    void planAttackSelected();
 
 private:
     void refreshCaseHeader();
@@ -46,6 +47,7 @@ private:
     QLabel *m_caseLabel = nullptr;
     QPushButton *m_addButton = nullptr;
     QPushButton *m_extractButton = nullptr;
+    QPushButton *m_planButton = nullptr;
     QTableWidget *m_table = nullptr;
 };
 

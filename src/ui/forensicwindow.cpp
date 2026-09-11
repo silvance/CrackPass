@@ -9,6 +9,8 @@
 #include "forensic/extraction/encryptionprobe.h"
 #include "forensic/extraction/processrunner.h"
 #include "forensic/extraction/toolresolver.h"
+#include "forensic/extraction/extraction.h"
+#include "attackplannerdialog.h"
 #include "settingsmanager.h"
 
 #include <QApplication>
@@ -64,6 +66,7 @@ ForensicWindow::ForensicWindow(QWidget *parent)
     toolbar->addSeparator();
     connect(toolbar->addAction(tr("Add Artifact...")), &QAction::triggered, this, &ForensicWindow::addArtifact);
     connect(toolbar->addAction(tr("Extract Hash")), &QAction::triggered, this, &ForensicWindow::extractSelected);
+    connect(toolbar->addAction(tr("Plan Attack...")), &QAction::triggered, this, &ForensicWindow::planAttackSelected);
 
     auto *central = new QWidget(this);
     auto *layout = new QVBoxLayout(central);
@@ -81,6 +84,9 @@ ForensicWindow::ForensicWindow(QWidget *parent)
     m_extractButton = new QPushButton(tr("Extract Hash from Selected Artifact"), buttons);
     connect(m_extractButton, &QPushButton::clicked, this, &ForensicWindow::extractSelected);
     buttonRow->addWidget(m_extractButton);
+    m_planButton = new QPushButton(tr("Plan Attack on Selected Artifact..."), buttons);
+    connect(m_planButton, &QPushButton::clicked, this, &ForensicWindow::planAttackSelected);
+    buttonRow->addWidget(m_planButton);
     layout->addWidget(buttons);
 
     m_table = new QTableWidget(0, 7, central);
@@ -104,6 +110,7 @@ void ForensicWindow::setCaseActionsEnabled(bool enabled)
 {
     m_addButton->setEnabled(enabled);
     m_extractButton->setEnabled(enabled);
+    m_planButton->setEnabled(enabled);
 }
 
 void ForensicWindow::newCase()
@@ -254,6 +261,49 @@ void ForensicWindow::extractSelected()
             .arg(outcome.record.extractorId,
                  mode ? QString::number(mode) : tr("(not yet selected)"),
                  r.hash));
+}
+
+void ForensicWindow::planAttackSelected()
+{
+    if (!m_workspace)
+        return;
+    const int row = m_table->currentRow();
+    if (row < 0 || row >= m_workspace->evidence().size()) {
+        QMessageBox::information(this, tr("Plan Attack"), tr("Select an artifact first."));
+        return;
+    }
+    const EvidenceItem item = m_workspace->evidence().at(row);
+
+    // Find the most recent successful extraction for this artifact with a
+    // resolved hashcat mode.
+    forensic::Extraction chosen;
+    bool found = false;
+    for (const auto &e : m_workspace->extractions()) {
+        if (e.evidenceId == item.id && e.status == QStringLiteral("success") && e.selectedMode != 0) {
+            chosen = e;
+            found = true;
+        }
+    }
+    if (!found) {
+        QMessageBox::information(
+            this, tr("Plan Attack"),
+            tr("This artifact has no extracted hash with a selected hashcat mode yet.\n"
+               "Use 'Extract Hash' first (and choose a mode if prompted)."));
+        return;
+    }
+
+    const QString hashFile = QDir(m_workspace->extractionsDir())
+                                 .filePath(chosen.id.toString(QUuid::WithoutBraces) + "/hash.txt");
+    QString hashTypeName;
+    for (const auto &opt : chosen.candidateModes)
+        if (opt.mode == chosen.selectedMode)
+            hashTypeName = opt.name;
+
+    const QString planDir = QDir(m_workspace->jobsDir())
+                                .filePath(QStringLiteral("plan-") + QUuid::createUuid().toString(QUuid::WithoutBraces));
+
+    AttackPlannerDialog dlg(chosen.selectedMode, hashTypeName, hashFile, planDir, this);
+    dlg.exec();
 }
 
 void ForensicWindow::refreshCaseHeader()

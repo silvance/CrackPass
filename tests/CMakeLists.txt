@@ -12,6 +12,9 @@ set(FORENSIC_TESTS
     test_encryptionprobe
     test_johnextractors
     test_extractionservice
+    test_attackcommandbuilder
+    test_knowledgematerializer
+    test_attackplanner
 )
 
 foreach(test_name ${FORENSIC_TESTS})

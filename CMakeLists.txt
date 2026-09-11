@@ -56,6 +56,18 @@ add_library(forensic_core STATIC
     src/forensic/extraction/johnextractors.h
     src/forensic/extraction/extraction.h
     src/forensic/extraction/extraction.cpp
+    src/forensic/planner/caseknowledge.h
+    src/forensic/planner/attacktemplate.h
+    src/forensic/planner/attacktemplate.cpp
+    src/forensic/planner/attackjobspec.h
+    src/forensic/planner/attackjobspec.cpp
+    src/forensic/planner/attackcommandbuilder.h
+    src/forensic/planner/attackcommandbuilder.cpp
+    src/forensic/planner/knowledgematerializer.h
+    src/forensic/planner/knowledgematerializer.cpp
+    src/forensic/planner/attackpreview.h
+    src/forensic/planner/attackplanner.h
+    src/forensic/planner/attackplanner.cpp
     src/forensic/hashingservice.h
     src/forensic/hashingservice.cpp
     src/forensic/jsonutil.h
@@ -96,6 +108,8 @@ add_executable(hashcat-gui WIN32
     src/ui/appshell.cpp
     src/ui/forensicwindow.h
     src/ui/forensicwindow.cpp
+    src/ui/attackplannerdialog.h
+    src/ui/attackplannerdialog.cpp
     src/resources.qrc
     src/hashcat-gui.rc
     src/aboutdialog.ui
