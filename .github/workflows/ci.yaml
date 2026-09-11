@@ -41,6 +41,10 @@ jobs:
           cmake -B build -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
           cmake --build build
 
+      - name: Test (Linux)
+        if: runner.os == 'Linux'
+        run: ctest --test-dir build --output-on-failure
+
       # ----- Windows setup -----
       - name: Set up MSYS2 with UCRT64 (Windows)
         if: runner.os == 'Windows'
@@ -59,3 +63,8 @@ jobs:
         run: |
           cmake -B build -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
           cmake --build build
+
+      - name: Test (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: ctest --test-dir build --output-on-failure
