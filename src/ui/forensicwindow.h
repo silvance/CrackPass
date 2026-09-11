@@ -32,17 +32,22 @@ private slots:
     void newCase();
     void openCase();
     void addArtifact();
+    void extractSelected();
+    void planAttackSelected();
 
 private:
     void refreshCaseHeader();
     void reloadEvidenceTable();
     void appendEvidenceRow(int row);
     void setCaseActionsEnabled(bool enabled);
+    QString latestExtractionSummary(const QString &evidenceId) const;
 
     std::unique_ptr<forensic::CaseWorkspace> m_workspace;
 
     QLabel *m_caseLabel = nullptr;
     QPushButton *m_addButton = nullptr;
+    QPushButton *m_extractButton = nullptr;
+    QPushButton *m_planButton = nullptr;
     QTableWidget *m_table = nullptr;
 };
 

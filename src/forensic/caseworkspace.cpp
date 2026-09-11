@@ -4,6 +4,7 @@
  */
 #include "caseworkspace.h"
 
+
 #include <QDir>
 #include <QFile>
 #include <QJsonDocument>
@@ -118,6 +119,8 @@ std::unique_ptr<CaseWorkspace> CaseWorkspace::open(const QString &caseDir, QStri
         return nullptr;
     if (!ws->loadEvidence(error))
         return nullptr;
+    if (!ws->loadExtractions(error))
+        return nullptr;
 
     return ws;
 }
@@ -203,5 +206,175 @@ IntakeResult CaseWorkspace::addEvidence(const QString &sourcePath)
 
     return result;
 }
+
+
+EvidenceItem *CaseWorkspace::evidenceById(const QUuid &id)
+{
+    for (EvidenceItem &e : m_evidence) {
+        if (e.id == id)
+            return &e;
+    }
+    return nullptr;
+}
+
+EncryptionState CaseWorkspace::probeEncryption(const QUuid &evidenceId) const
+{
+    for (const EvidenceItem &e : m_evidence) {
+        if (e.id == evidenceId)
+            return EncryptionProbe::probe(e.type, e.originalPath);
+    }
+    return EncryptionState::Unknown;
+}
+
+bool CaseWorkspace::loadExtractions(QString *error)
+{
+    m_extractions.clear();
+    QDir dir(extractionsDir());
+    const QStringList ids = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString &id : ids) {
+        const QString metaPath = dir.filePath(id + QStringLiteral("/extraction.json"));
+        QFile f(metaPath);
+        if (!f.open(QIODevice::ReadOnly))
+            continue;
+        QJsonParseError perr;
+        const QJsonDocument doc = QJsonDocument::fromJson(f.readAll(), &perr);
+        f.close();
+        if (perr.error != QJsonParseError::NoError || !doc.isObject()) {
+            if (error) *error = QStringLiteral("Corrupt extraction metadata: %1").arg(metaPath);
+            return false;
+        }
+        m_extractions.append(Extraction::fromJson(doc.object()));
+    }
+    return true;
+}
+
+bool CaseWorkspace::persistExtraction(const Extraction &e, QString *error) const
+{
+    const QString dir = QDir(extractionsDir()).filePath(e.id.toString(QUuid::WithoutBraces));
+    if (!QDir().mkpath(dir)) {
+        if (error) *error = QStringLiteral("Cannot create extraction directory: %1").arg(dir);
+        return false;
+    }
+    QFile f(QDir(dir).filePath(QStringLiteral("extraction.json")));
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        if (error) *error = QStringLiteral("Cannot write extraction metadata: %1").arg(f.errorString());
+        return false;
+    }
+    f.write(QJsonDocument(e.toJson()).toJson(QJsonDocument::Indented));
+    return true;
+}
+
+CaseWorkspace::ExtractionOutcome CaseWorkspace::extractHash(const QUuid &evidenceId,
+                                                            const ExtractionContext &ctx)
+{
+    ExtractionOutcome outcome;
+
+    EvidenceItem *item = evidenceById(evidenceId);
+    if (!item) {
+        outcome.error = QStringLiteral("No such evidence item in this case.");
+        return outcome;
+    }
+
+    HashExtractor *extractor = m_extractors.extractorFor(item->type);
+    if (!extractor) {
+        outcome.error = QStringLiteral("No extractor is available for artifact type '%1'.")
+                            .arg(item->type.isUnknown() ? QStringLiteral("unknown") : item->type.id);
+        return outcome;
+    }
+
+    Extraction rec;
+    rec.id = QUuid::createUuid();
+    rec.caseId = m_info.id;
+    rec.evidenceId = evidenceId;
+    rec.startedUtc = QDateTime::currentDateTimeUtc();
+
+    const ExtractionResult result = extractor->extract(*item, ctx);
+
+    rec.endedUtc = QDateTime::currentDateTimeUtc();
+    rec.extractorId = result.extractorId;
+    rec.toolProgram = result.toolProgram;
+    rec.argv = result.argv;
+    rec.status = Extraction::statusToString(result.status);
+    rec.message = result.message;
+    rec.exitCode = result.exitCode;
+    rec.candidateModes = result.candidateModes;
+    // Auto-select only when exactly one mode is possible; never guess otherwise.
+    rec.selectedMode = (result.candidateModes.size() == 1) ? result.candidateModes.first().mode : 0;
+
+    // Persist artifacts (hash separate from evidence; raw logs for troubleshooting).
+    const QString dir = QDir(extractionsDir()).filePath(rec.id.toString(QUuid::WithoutBraces));
+    QDir().mkpath(dir);
+    const auto writeFile = [&dir](const QString &name, const QByteArray &data) -> QString {
+        QFile f(QDir(dir).filePath(name));
+        if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+            return QString();
+        f.write(data);
+        return name;
+    };
+    if (!result.hash.isEmpty())
+        rec.hashArtifactPath = writeFile(QStringLiteral("hash.txt"), result.hash.toUtf8());
+    rec.stdoutPath = writeFile(QStringLiteral("stdout.log"), result.stdOut.toUtf8());
+    rec.stderrPath = writeFile(QStringLiteral("stderr.log"), result.stdErr.toUtf8());
+
+    QString perr;
+    if (!persistExtraction(rec, &perr)) {
+        outcome.error = perr;
+        return outcome;
+    }
+    m_extractions.append(rec);
+
+    QJsonObject details;
+    details[QStringLiteral("extractionId")] = rec.id.toString(QUuid::WithoutBraces);
+    details[QStringLiteral("evidenceId")] = evidenceId.toString(QUuid::WithoutBraces);
+    details[QStringLiteral("extractorId")] = rec.extractorId;
+    details[QStringLiteral("status")] = rec.status;
+    details[QStringLiteral("exitCode")] = rec.exitCode;
+    details[QStringLiteral("selectedMode")] = static_cast<double>(rec.selectedMode);
+    details[QStringLiteral("candidateModeCount")] = rec.candidateModes.size();
+    if (m_audit) {
+        m_audit->append(m_info.examiner.isEmpty() ? QStringLiteral("system") : m_info.examiner,
+                        QStringLiteral("hash_extracted"), QStringLiteral("extraction"),
+                        rec.id.toString(QUuid::WithoutBraces), details);
+    }
+
+    outcome.ok = true;
+    outcome.record = rec;
+    outcome.result = result;
+    return outcome;
+}
+
+bool CaseWorkspace::selectExtractionMode(const QUuid &extractionId, quint32 mode, QString *error)
+{
+    for (Extraction &e : m_extractions) {
+        if (e.id != extractionId)
+            continue;
+        bool valid = false;
+        for (const HashcatModeOption &opt : e.candidateModes) {
+            if (opt.mode == mode) { valid = true; break; }
+        }
+        if (!valid) {
+            if (error) *error = QStringLiteral("Mode %1 is not among the candidate modes.").arg(mode);
+            return false;
+        }
+        e.selectedMode = mode;
+        QString perr;
+        if (!persistExtraction(e, &perr)) {
+            if (error) *error = perr;
+            return false;
+        }
+        if (m_audit) {
+            QJsonObject details;
+            details[QStringLiteral("extractionId")] = extractionId.toString(QUuid::WithoutBraces);
+            details[QStringLiteral("selectedMode")] = static_cast<double>(mode);
+            m_audit->append(m_info.examiner.isEmpty() ? QStringLiteral("system") : m_info.examiner,
+                            QStringLiteral("extraction_mode_selected"), QStringLiteral("extraction"),
+                            extractionId.toString(QUuid::WithoutBraces), details);
+        }
+        return true;
+    }
+    if (error) *error = QStringLiteral("No such extraction.");
+    return false;
+}
+
 
 } // namespace forensic

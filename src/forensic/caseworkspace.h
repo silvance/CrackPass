@@ -11,6 +11,8 @@
 #include "evidenceintake.h"
 #include "evidenceitem.h"
 #include "extractorregistry.h"
+#include "extraction/extraction.h"
+#include "extraction/encryptionprobe.h"
 
 #include <QList>
 #include <QString>
@@ -45,6 +47,28 @@ public:
     // Intake + persist + audit. Never modifies the source file.
     IntakeResult addEvidence(const QString &sourcePath);
     QList<EvidenceItem> evidence() const { return m_evidence; }
+    EvidenceItem *evidenceById(const QUuid &id);
+
+    // Content-based check of whether an evidence item appears encrypted.
+    EncryptionState probeEncryption(const QUuid &evidenceId) const;
+
+    struct ExtractionOutcome {
+        bool ok = false;              // orchestration succeeded (a record was produced)
+        Extraction record;
+        ExtractionResult result;      // full result incl. captured output + candidate modes
+        QString error;                // set when orchestration could not run at all
+    };
+
+    // Runs the appropriate extractor for the evidence item WITHOUT modifying the
+    // evidence, persists an Extraction record (+ hash/stdout/stderr files), and
+    // audits it. If exactly one hashcat mode is possible it is auto-selected;
+    // otherwise selectedMode stays 0 and the examiner must choose.
+    ExtractionOutcome extractHash(const QUuid &evidenceId, const ExtractionContext &ctx);
+
+    // Records the examiner's mode choice for an ambiguous extraction (persist + audit).
+    bool selectExtractionMode(const QUuid &extractionId, quint32 mode, QString *error = nullptr);
+
+    QList<Extraction> extractions() const { return m_extractions; }
 
     AuditLog &audit() { return *m_audit; }
     const ArtifactAnalyzerRegistry &analyzers() const { return m_analyzers; }
@@ -67,10 +91,13 @@ private:
     bool writeCaseManifest(QString *error) const;
     bool loadEvidence(QString *error);
     bool persistEvidence(const EvidenceItem &item, QString *error) const;
+    bool persistExtraction(const Extraction &e, QString *error) const;
+    bool loadExtractions(QString *error);
 
     QString m_rootPath;
     CaseInfo m_info;
     QList<EvidenceItem> m_evidence;
+    QList<Extraction> m_extractions;
     std::unique_ptr<AuditLog> m_audit;
     ArtifactAnalyzerRegistry m_analyzers = ArtifactAnalyzerRegistry::withBuiltins();
     ExtractorRegistry m_extractors = ExtractorRegistry::withBuiltins();

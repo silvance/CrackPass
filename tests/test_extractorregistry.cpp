@@ -7,28 +7,27 @@
 #include <QtTest>
 
 using forensic::ArtifactType;
-using forensic::ExtractionStatus;
 using forensic::ExtractorRegistry;
 
 class TestExtractorRegistry : public QObject
 {
     Q_OBJECT
 
+private:
+    static ArtifactType type(const QString &id) { return ArtifactType{id, id, 0.9}; }
+
 private slots:
-    void resolvesKnownType();
+    void coversAllTargetFormats();
     void noExtractorForUnknown();
-    void noExtractorForUnsupportedType();
-    void extractIsNotImplementedYet();
+    void resolvesToolIds();
 };
 
-void TestExtractorRegistry::resolvesKnownType()
+void TestExtractorRegistry::coversAllTargetFormats()
 {
     auto reg = ExtractorRegistry::withBuiltins();
-    const ArtifactType pdf{QStringLiteral("pdf"), QStringLiteral("PDF"), 0.95};
-    QVERIFY(reg.hasExtractorFor(pdf));
-    auto *ex = reg.extractorFor(pdf);
-    QVERIFY(ex != nullptr);
-    QCOMPARE(ex->defaultHashMode(), 10500u);
+    for (const QString &id : {"ms-office", "pdf", "zip", "rar", "7z", "keepass-kdbx"}) {
+        QVERIFY2(reg.hasExtractorFor(type(id)), qPrintable(QStringLiteral("missing extractor for %1").arg(id)));
+    }
 }
 
 void TestExtractorRegistry::noExtractorForUnknown()
@@ -36,22 +35,16 @@ void TestExtractorRegistry::noExtractorForUnknown()
     auto reg = ExtractorRegistry::withBuiltins();
     QVERIFY(!reg.hasExtractorFor(ArtifactType::unknown()));
     QCOMPARE(reg.extractorFor(ArtifactType::unknown()), nullptr);
+    // A recognized-but-unsupported type (e.g. a bare unknown token) has none.
+    QVERIFY(!reg.hasExtractorFor(type("tar")));
 }
 
-void TestExtractorRegistry::noExtractorForUnsupportedType()
+void TestExtractorRegistry::resolvesToolIds()
 {
     auto reg = ExtractorRegistry::withBuiltins();
-    const ArtifactType zip{QStringLiteral("zip"), QStringLiteral("ZIP"), 0.6};
-    QVERIFY(!reg.hasExtractorFor(zip));
-}
-
-void TestExtractorRegistry::extractIsNotImplementedYet()
-{
-    auto reg = ExtractorRegistry::withBuiltins();
-    const ArtifactType pdf{QStringLiteral("pdf"), QStringLiteral("PDF"), 0.95};
-    forensic::EvidenceItem dummy;
-    const auto result = reg.extractorFor(pdf)->extract(dummy);
-    QCOMPARE(result.status, ExtractionStatus::NotImplemented);
+    QCOMPARE(reg.extractorFor(type("pdf"))->toolId(), QStringLiteral("pdf2john"));
+    QCOMPARE(reg.extractorFor(type("keepass-kdbx"))->toolId(), QStringLiteral("keepass2john"));
+    QCOMPARE(reg.extractorFor(type("ms-office"))->id(), QStringLiteral("office2john"));
 }
 
 QTEST_GUILESS_MAIN(TestExtractorRegistry)
