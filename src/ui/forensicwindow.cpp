@@ -20,6 +20,7 @@
 #include "forensic/execution/jobqueue.h"
 #include "forensic/execution/hashcatexecutionbackend.h"
 #include "forensic/execution/hashcatstatus.h"
+#include "forensic/recovery/recoverycontroller.h"
 #include "forensic/planner/attackcommandbuilder.h"
 #include "forensic/report/reportbuilder.h"
 #include "forensic/report/reportrenderer.h"
@@ -125,6 +126,10 @@ ForensicWindow::ForensicWindow(QWidget *parent)
     m_backend = new HashcatExecutionBackend(
         SettingsManager::instance().getKey<QString>("hashcatPath"), this);
     m_queue = new JobQueue(m_backend, this);
+    // The controller owns the persistence side of recovery (job state + recovered
+    // credentials -> case). Construct it before wiring the display slots so its
+    // writes land before the UI reads them back.
+    m_recovery = new forensic::RecoveryController(m_queue, this);
     connect(m_queue, &JobQueue::jobChanged, this, &ForensicWindow::onJobChanged);
     connect(m_queue, &JobQueue::jobStatus, this, &ForensicWindow::onJobStatus);
     connect(m_queue, &JobQueue::credentialRecovered, this, &ForensicWindow::onCredentialRecovered);
@@ -261,6 +266,7 @@ void ForensicWindow::newCase()
         return;
     }
     m_workspace = std::move(ws);
+    m_recovery->setWorkspace(m_workspace.get());
     setCaseActionsEnabled(true);
     refreshCaseHeader();
     reloadEvidenceTable();
@@ -278,6 +284,7 @@ void ForensicWindow::openCase()
         return;
     }
     m_workspace = std::move(ws);
+    m_recovery->setWorkspace(m_workspace.get());
     setCaseActionsEnabled(true);
     refreshCaseHeader();
     reloadEvidenceTable();
@@ -440,31 +447,10 @@ void ForensicWindow::planAttackSelected()
         return;
     }
 
-    const forensic::AttackJobSpec spec = dlg.plannedSpec();
-    CrackingJob job;
-    job.id = QUuid::createUuid();
-    job.caseId = m_workspace->info().id;
-    job.evidenceId = item.id;
-    job.hashMode = spec.hashMode;
-    job.attackMode = spec.attackMode;
-    job.hashcatPath = hashcatPath;
-    job.hashcatVersion = probeHashcatVersion(hashcatPath);
-    job.hashcatArgs = forensic::AttackCommandBuilder::buildArgs(spec);
-    job.hashFile = spec.hashFile;
-    job.wordlists = spec.wordlists;
-    job.rules = spec.rules;
-    job.mask = spec.mask;
-
-    const QString jobDir = m_workspace->jobDir(job.id);
-    QDir().mkpath(jobDir);
-    JobQueue::JobPaths paths;
-    paths.workingDir = jobDir;
-    paths.sessionName = QStringLiteral("cp-") + job.id.toString(QUuid::WithoutBraces).left(8);
-    paths.potfilePath = QDir(jobDir).filePath(QStringLiteral("job.potfile"));
-    paths.outfilePath = QDir(jobDir).filePath(QStringLiteral("cracked.out"));
-    paths.restorePath = QDir(jobDir).filePath(QStringLiteral("session.restore"));
-
-    m_queue->enqueue(job, paths);
+    // The controller builds the reproducible job, lays out its session files,
+    // enqueues it, and persists the record + later state/credentials.
+    m_recovery->queueRecoveryJob(dlg.plannedSpec(), item.id, hashcatPath,
+                                 probeHashcatVersion(hashcatPath));
     m_tabs->setCurrentIndex(1); // show the Jobs tab
 }
 
@@ -596,9 +582,8 @@ void ForensicWindow::upsertJobRow(const CrackingJob &job)
 
 void ForensicWindow::onJobChanged(const CrackingJob &job)
 {
+    // Display only; the RecoveryController persists the job record + state.
     upsertJobRow(job);
-    if (m_workspace)
-        m_workspace->saveJob(job); // persist reproducible record + state
 }
 
 void ForensicWindow::onJobStatus(const QUuid &jobId, const forensic::HashcatStatus &status)
@@ -624,8 +609,8 @@ void ForensicWindow::onJobStatus(const QUuid &jobId, const forensic::HashcatStat
 
 void ForensicWindow::onCredentialRecovered(const forensic::RecoveredCredential &cred)
 {
-    if (m_workspace)
-        m_workspace->addRecoveredCredential(cred); // tied to job/artifact/case + timestamp
+    // The RecoveryController persists the credential (it is connected first, so
+    // it has already been written to the case by the time we refresh below).
     const int row = jobRow(cred.jobId);
     if (row >= 0)
         m_jobsTable->item(row, 11)->setText(cred.plaintext);
