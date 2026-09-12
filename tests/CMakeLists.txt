@@ -19,6 +19,7 @@ set(FORENSIC_TESTS
     test_jobqueue
     test_jobpersistence
     test_backendcompose
+    test_reportbuilder
 )
 
 foreach(test_name ${FORENSIC_TESTS})

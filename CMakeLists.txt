@@ -76,6 +76,12 @@ add_library(forensic_core STATIC
     src/forensic/execution/jobqueue.cpp
     src/forensic/execution/hashcatexecutionbackend.h
     src/forensic/execution/hashcatexecutionbackend.cpp
+    src/forensic/report/recoveryreport.h
+    src/forensic/report/recoveryreport.cpp
+    src/forensic/report/reportbuilder.h
+    src/forensic/report/reportbuilder.cpp
+    src/forensic/report/reportrenderer.h
+    src/forensic/report/reportrenderer.cpp
     src/forensic/hashingservice.h
     src/forensic/hashingservice.cpp
     src/forensic/jsonutil.h

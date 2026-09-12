@@ -27,6 +27,7 @@ struct Extraction
     QUuid evidenceId;
 
     QString extractorId;
+    QString extractorVersion;
     QString toolProgram;
     QStringList argv;
 

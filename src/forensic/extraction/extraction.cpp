@@ -36,6 +36,7 @@ QJsonObject Extraction::toJson() const
     obj[QStringLiteral("caseId")] = caseId;
     obj[QStringLiteral("evidenceId")] = evidenceId.toString(QUuid::WithoutBraces);
     obj[QStringLiteral("extractorId")] = extractorId;
+    obj[QStringLiteral("extractorVersion")] = extractorVersion;
     obj[QStringLiteral("toolProgram")] = toolProgram;
     obj[QStringLiteral("argv")] = argvArr;
     obj[QStringLiteral("status")] = status;
@@ -58,6 +59,7 @@ Extraction Extraction::fromJson(const QJsonObject &obj)
     e.caseId = obj.value(QStringLiteral("caseId")).toString();
     e.evidenceId = QUuid::fromString(obj.value(QStringLiteral("evidenceId")).toString());
     e.extractorId = obj.value(QStringLiteral("extractorId")).toString();
+    e.extractorVersion = obj.value(QStringLiteral("extractorVersion")).toString();
     e.toolProgram = obj.value(QStringLiteral("toolProgram")).toString();
     for (const QJsonValue &v : obj.value(QStringLiteral("argv")).toArray())
         e.argv.append(v.toString());

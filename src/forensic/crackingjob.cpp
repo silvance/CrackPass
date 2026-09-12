@@ -79,6 +79,10 @@ QJsonObject CrackingJob::toJson() const
     obj[QStringLiteral("attackMode")] = attackMode;
     obj[QStringLiteral("hashcatArgs")] = argsArray;
     obj[QStringLiteral("hashcatPath")] = hashcatPath;
+    obj[QStringLiteral("hashFile")] = hashFile;
+    obj[QStringLiteral("mask")] = mask;
+    { QJsonArray a; for (const QString &w : wordlists) a.append(w); obj[QStringLiteral("wordlists")] = a; }
+    { QJsonArray a; for (const QString &r : rules) a.append(r); obj[QStringLiteral("rules")] = a; }
     obj[QStringLiteral("hashcatVersion")] = hashcatVersion;
     obj[QStringLiteral("devices")] = devArray;
     obj[QStringLiteral("startedUtc")] = jsonutil::fromDateTime(startedUtc);
@@ -99,6 +103,10 @@ CrackingJob CrackingJob::fromJson(const QJsonObject &obj)
     for (const QJsonValue &v : obj.value(QStringLiteral("hashcatArgs")).toArray())
         j.hashcatArgs.append(v.toString());
     j.hashcatPath = obj.value(QStringLiteral("hashcatPath")).toString();
+    j.hashFile = obj.value(QStringLiteral("hashFile")).toString();
+    j.mask = obj.value(QStringLiteral("mask")).toString();
+    for (const QJsonValue &v : obj.value(QStringLiteral("wordlists")).toArray()) j.wordlists.append(v.toString());
+    for (const QJsonValue &v : obj.value(QStringLiteral("rules")).toArray()) j.rules.append(v.toString());
     j.hashcatVersion = obj.value(QStringLiteral("hashcatVersion")).toString();
     for (const QJsonValue &v : obj.value(QStringLiteral("devices")).toArray())
         j.devices.append(ComputeDevice::fromJson(v.toObject()));
