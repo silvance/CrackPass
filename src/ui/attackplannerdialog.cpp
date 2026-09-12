@@ -161,10 +161,14 @@ AttackPlannerDialog::AttackPlannerDialog(quint32 hashMode, const QString &hashTy
 
     auto *buttons = new QDialogButtonBox(this);
     buttons->addButton(tr("Update Preview"), QDialogButtonBox::ApplyRole);
+    auto *queueBtn = buttons->addButton(tr("Queue Attack"), QDialogButtonBox::AcceptRole);
     buttons->addButton(QDialogButtonBox::Close);
     connect(buttons, &QDialogButtonBox::clicked, this, [this, buttons](QAbstractButton *b) {
-        if (buttons->buttonRole(b) == QDialogButtonBox::ApplyRole)
+        const auto role = buttons->buttonRole(b);
+        if (role == QDialogButtonBox::ApplyRole)
             updatePreview();
+        else if (role == QDialogButtonBox::AcceptRole)
+            requestQueue();
         else
             reject();
     });
@@ -173,6 +177,18 @@ AttackPlannerDialog::AttackPlannerDialog(quint32 hashMode, const QString &hashTy
     // Live preview on the common interactions.
     connect(m_template, &QComboBox::currentIndexChanged, this, &AttackPlannerDialog::updatePreview);
     updatePreview();
+    Q_UNUSED(queueBtn);
+}
+
+void AttackPlannerDialog::requestQueue()
+{
+    updatePreview();
+    if (!m_lastOk) {
+        m_status->setText(tr("Cannot queue: the plan is not valid yet."));
+        return;
+    }
+    m_queueRequested = true;
+    accept();
 }
 
 AttackTemplate AttackPlannerDialog::currentTemplate() const
@@ -215,6 +231,8 @@ void AttackPlannerDialog::updatePreview()
 
     AttackPlanner planner;
     const PlanResult r = planner.plan(currentTemplate(), collectKnowledge(), ctx);
+    m_lastOk = r.ok;
+    m_lastSpec = r.spec;
 
     if (!r.ok) {
         m_preview->setPlainText(QString());

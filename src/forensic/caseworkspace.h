@@ -13,6 +13,8 @@
 #include "extractorregistry.h"
 #include "extraction/extraction.h"
 #include "extraction/encryptionprobe.h"
+#include "crackingjob.h"
+#include "recoveredcredential.h"
 
 #include <QList>
 #include <QString>
@@ -70,6 +72,16 @@ public:
 
     QList<Extraction> extractions() const { return m_extractions; }
 
+    // Jobs: persist a cracking job record and list them (loaded on open).
+    bool saveJob(const CrackingJob &job, QString *error = nullptr);
+    QList<CrackingJob> jobs() const { return m_jobs; }
+    QString jobDir(const QUuid &jobId) const;
+
+    // Recovered credentials: recorded against job/artifact/case, timestamped,
+    // and always readable (no gating). Persisted + audited.
+    bool addRecoveredCredential(const RecoveredCredential &cred, QString *error = nullptr);
+    QList<RecoveredCredential> recoveredCredentials() const { return m_credentials; }
+
     AuditLog &audit() { return *m_audit; }
     const ArtifactAnalyzerRegistry &analyzers() const { return m_analyzers; }
     ExtractorRegistry &extractors() { return m_extractors; }
@@ -93,11 +105,15 @@ private:
     bool persistEvidence(const EvidenceItem &item, QString *error) const;
     bool persistExtraction(const Extraction &e, QString *error) const;
     bool loadExtractions(QString *error);
+    bool loadJobs(QString *error);
+    bool loadCredentials(QString *error);
 
     QString m_rootPath;
     CaseInfo m_info;
     QList<EvidenceItem> m_evidence;
     QList<Extraction> m_extractions;
+    QList<CrackingJob> m_jobs;
+    QList<RecoveredCredential> m_credentials;
     std::unique_ptr<AuditLog> m_audit;
     ArtifactAnalyzerRegistry m_analyzers = ArtifactAnalyzerRegistry::withBuiltins();
     ExtractorRegistry m_extractors = ExtractorRegistry::withBuiltins();

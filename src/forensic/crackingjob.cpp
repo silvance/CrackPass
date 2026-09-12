@@ -12,26 +12,28 @@ namespace forensic {
 QString jobStateToString(JobState state)
 {
     switch (state) {
-    case JobState::Created:   return QStringLiteral("created");
-    case JobState::Queued:    return QStringLiteral("queued");
+    case JobState::Pending:   return QStringLiteral("pending");
+    case JobState::Preparing: return QStringLiteral("preparing");
     case JobState::Running:   return QStringLiteral("running");
     case JobState::Paused:    return QStringLiteral("paused");
-    case JobState::Completed: return QStringLiteral("completed");
+    case JobState::Exhausted: return QStringLiteral("exhausted");
+    case JobState::Recovered: return QStringLiteral("recovered");
+    case JobState::Stopped:   return QStringLiteral("stopped");
     case JobState::Failed:    return QStringLiteral("failed");
-    case JobState::Cancelled: return QStringLiteral("cancelled");
     }
-    return QStringLiteral("created");
+    return QStringLiteral("pending");
 }
 
 JobState jobStateFromString(const QString &s)
 {
-    if (s == QStringLiteral("queued"))    return JobState::Queued;
+    if (s == QStringLiteral("preparing")) return JobState::Preparing;
     if (s == QStringLiteral("running"))   return JobState::Running;
     if (s == QStringLiteral("paused"))    return JobState::Paused;
-    if (s == QStringLiteral("completed")) return JobState::Completed;
+    if (s == QStringLiteral("exhausted")) return JobState::Exhausted;
+    if (s == QStringLiteral("recovered")) return JobState::Recovered;
+    if (s == QStringLiteral("stopped"))   return JobState::Stopped;
     if (s == QStringLiteral("failed"))    return JobState::Failed;
-    if (s == QStringLiteral("cancelled")) return JobState::Cancelled;
-    return JobState::Created;
+    return JobState::Pending;
 }
 
 QJsonObject ComputeDevice::toJson() const

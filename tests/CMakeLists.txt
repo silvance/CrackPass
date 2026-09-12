@@ -15,6 +15,10 @@ set(FORENSIC_TESTS
     test_attackcommandbuilder
     test_knowledgematerializer
     test_attackplanner
+    test_hashcatstatusparser
+    test_jobqueue
+    test_jobpersistence
+    test_backendcompose
 )
 
 foreach(test_name ${FORENSIC_TESTS})

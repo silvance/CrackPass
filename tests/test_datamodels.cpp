@@ -36,7 +36,7 @@ void TestDataModels::crackingJobRoundTrip()
     j.devices = {ComputeDevice{1, "NVIDIA RTX 4090", "CUDA"}};
     j.startedUtc = QDateTime::currentDateTimeUtc();
     j.endedUtc = j.startedUtc.addSecs(90);
-    j.state = JobState::Completed;
+    j.state = JobState::Recovered;
     j.result = "cracked";
 
     const CrackingJob back = CrackingJob::fromJson(j.toJson());
@@ -47,7 +47,7 @@ void TestDataModels::crackingJobRoundTrip()
     QCOMPARE(back.hashcatVersion, j.hashcatVersion);
     QCOMPARE(back.devices.size(), 1);
     QCOMPARE(back.devices.first().name, QStringLiteral("NVIDIA RTX 4090"));
-    QCOMPARE(back.state, JobState::Completed);
+    QCOMPARE(back.state, JobState::Recovered);
 }
 
 void TestDataModels::recoveredCredentialRoundTrip()

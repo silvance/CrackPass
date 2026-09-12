@@ -8,6 +8,7 @@
 #include <QDir>
 #include <QFile>
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QRegularExpression>
 #include <QUuid>
 
@@ -120,6 +121,10 @@ std::unique_ptr<CaseWorkspace> CaseWorkspace::open(const QString &caseDir, QStri
     if (!ws->loadEvidence(error))
         return nullptr;
     if (!ws->loadExtractions(error))
+        return nullptr;
+    if (!ws->loadJobs(error))
+        return nullptr;
+    if (!ws->loadCredentials(error))
         return nullptr;
 
     return ws;
@@ -376,5 +381,127 @@ bool CaseWorkspace::selectExtractionMode(const QUuid &extractionId, quint32 mode
     return false;
 }
 
+
+
+QString CaseWorkspace::jobDir(const QUuid &jobId) const
+{
+    return QDir(jobsDir()).filePath(jobId.toString(QUuid::WithoutBraces));
+}
+
+bool CaseWorkspace::saveJob(const CrackingJob &job, QString *error)
+{
+    const QString dir = jobDir(job.id);
+    if (!QDir().mkpath(dir)) {
+        if (error) *error = QStringLiteral("Cannot create job directory: %1").arg(dir);
+        return false;
+    }
+    QFile f(QDir(dir).filePath(QStringLiteral("job.json")));
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        if (error) *error = QStringLiteral("Cannot write job.json: %1").arg(f.errorString());
+        return false;
+    }
+    f.write(QJsonDocument(job.toJson()).toJson(QJsonDocument::Indented));
+
+    const int i = [&] {
+        for (int k = 0; k < m_jobs.size(); ++k)
+            if (m_jobs.at(k).id == job.id) return k;
+        return -1;
+    }();
+    const bool isNew = (i < 0);
+    if (isNew)
+        m_jobs.append(job);
+    else
+        m_jobs[i] = job;
+
+    if (m_audit && isNew) {
+        QJsonObject details;
+        details[QStringLiteral("jobId")] = job.id.toString(QUuid::WithoutBraces);
+        details[QStringLiteral("evidenceId")] = job.evidenceId.toString(QUuid::WithoutBraces);
+        details[QStringLiteral("hashMode")] = static_cast<double>(job.hashMode);
+        details[QStringLiteral("attackMode")] = job.attackMode;
+        details[QStringLiteral("hashcatArgs")] = job.hashcatArgs.join(QLatin1Char(' '));
+        m_audit->append(m_info.examiner.isEmpty() ? QStringLiteral("system") : m_info.examiner,
+                        QStringLiteral("job_created"), QStringLiteral("job"),
+                        job.id.toString(QUuid::WithoutBraces), details);
+    }
+    return true;
+}
+
+bool CaseWorkspace::loadJobs(QString *error)
+{
+    m_jobs.clear();
+    QDir dir(jobsDir());
+    const QStringList ids = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString &id : ids) {
+        QFile f(dir.filePath(id + QStringLiteral("/job.json")));
+        if (!f.open(QIODevice::ReadOnly))
+            continue; // plan-* dirs and other subdirs are skipped
+        QJsonParseError perr;
+        const QJsonDocument doc = QJsonDocument::fromJson(f.readAll(), &perr);
+        f.close();
+        if (perr.error != QJsonParseError::NoError || !doc.isObject()) {
+            if (error) *error = QStringLiteral("Corrupt job.json in %1").arg(id);
+            return false;
+        }
+        m_jobs.append(CrackingJob::fromJson(doc.object()));
+    }
+    return true;
+}
+
+bool CaseWorkspace::addRecoveredCredential(const RecoveredCredential &cred, QString *error)
+{
+    RecoveredCredential c = cred;
+    if (c.id.isNull())
+        c.id = QUuid::createUuid();
+    if (c.caseId.isEmpty())
+        c.caseId = m_info.id;
+    m_credentials.append(c);
+
+    // Persist the full set as results/recovered.json.
+    const QString dir = QDir(m_rootPath).filePath(QStringLiteral("results"));
+    QDir().mkpath(dir);
+    QFile f(QDir(dir).filePath(QStringLiteral("recovered.json")));
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        if (error) *error = QStringLiteral("Cannot write recovered.json: %1").arg(f.errorString());
+        return false;
+    }
+    QJsonArray arr;
+    for (const RecoveredCredential &rc : m_credentials)
+        arr.append(rc.toJson());
+    f.write(QJsonDocument(arr).toJson(QJsonDocument::Indented));
+
+    if (m_audit) {
+        // Record recovery metadata (not the plaintext) in the audit trail.
+        QJsonObject details;
+        details[QStringLiteral("credentialId")] = c.id.toString(QUuid::WithoutBraces);
+        details[QStringLiteral("jobId")] = c.jobId.toString(QUuid::WithoutBraces);
+        details[QStringLiteral("evidenceId")] = c.evidenceId.toString(QUuid::WithoutBraces);
+        m_audit->append(m_info.examiner.isEmpty() ? QStringLiteral("system") : m_info.examiner,
+                        QStringLiteral("credential_recovered"), QStringLiteral("credential"),
+                        c.id.toString(QUuid::WithoutBraces), details);
+    }
+    return true;
+}
+
+bool CaseWorkspace::loadCredentials(QString *error)
+{
+    m_credentials.clear();
+    QFile f(QDir(m_rootPath).filePath(QStringLiteral("results/recovered.json")));
+    if (!f.exists())
+        return true;
+    if (!f.open(QIODevice::ReadOnly)) {
+        if (error) *error = QStringLiteral("Cannot read recovered.json");
+        return false;
+    }
+    QJsonParseError perr;
+    const QJsonDocument doc = QJsonDocument::fromJson(f.readAll(), &perr);
+    if (perr.error != QJsonParseError::NoError || !doc.isArray()) {
+        if (error) *error = QStringLiteral("Corrupt recovered.json");
+        return false;
+    }
+    for (const QJsonValue &v : doc.array())
+        m_credentials.append(RecoveredCredential::fromJson(v.toObject()));
+    return true;
+}
 
 } // namespace forensic
