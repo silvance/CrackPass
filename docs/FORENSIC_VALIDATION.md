@@ -71,11 +71,21 @@ continue on unverifiable state.
   so there is no fragile `hash:plain` split to mis-handle when a password
   contains colons or spaces.
 - hashcat's `$HEX[...]` encoding (used for separators/non-printable/Unicode
-  bytes) is decoded back to the literal password (UTF-8).
+  bytes) is decoded back to the **exact password bytes**. A password is a byte
+  string, and not every byte string is valid UTF-8 (a Latin-1 or binary
+  password is legal), so the credential keeps the raw bytes (`rawPlaintext`,
+  persisted as `rawHex`) as the forensic ground truth and derives a best-effort
+  display form separately: the decoded text when the bytes are valid UTF-8,
+  otherwise the canonical, reversible `$HEX[..]` notation. The `encoding` field
+  (`utf-8` / `raw`) records which applies, and the report shows it. This avoids
+  the earlier lossy `QString::fromUtf8` decode that replaced invalid bytes with
+  U+FFFD and destroyed the true password. Legacy records without `rawHex` load
+  with the raw bytes reconstructed from the stored display text.
 - The recovered credential is associated with the job's target hash (read from
   the extracted-hash file) and thereby to the artifact and case.
-- Tests: `test_crackedplain` (colon, space, Unicode, literal `$`-text,
-  outfile-format assertion).
+- Tests: `test_crackedplain` (colon, space, Unicode, non-UTF-8 lossless
+  round-trip, literal `$`-text, outfile-format assertion); `test_datamodels`
+  (raw-byte and legacy credential round-trips).
 
 ## 5. Pause / stop / resume semantics
 

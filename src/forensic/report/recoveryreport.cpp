@@ -54,6 +54,7 @@ QJsonObject RecoveryReport::toJson() const
     credential[QStringLiteral("recovered")] = recovered;
     if (recovered) {
         credential[QStringLiteral("plaintext")] = recoveredPlaintext;
+        credential[QStringLiteral("encoding")] = recoveredEncoding;
         credential[QStringLiteral("hash")] = recoveredHash;
         credential[QStringLiteral("recoveredUtc")] = recoveredUtc;
     }

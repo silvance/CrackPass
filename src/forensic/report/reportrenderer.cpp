@@ -95,6 +95,8 @@ QString ReportRenderer::toHtml(const RecoveryReport &report)
     if (report.recovered) {
         h += QStringLiteral("<table class=\"rec\">");
         h += row(QStringLiteral("Plaintext"), report.recoveredPlaintext);
+        if (!report.recoveredEncoding.isEmpty())
+            h += row(QStringLiteral("Encoding"), report.recoveredEncoding);
         h += row(QStringLiteral("Hash"), report.recoveredHash);
         h += row(QStringLiteral("Recovered (UTC)"), report.recoveredUtc);
         h += QStringLiteral("</table>");

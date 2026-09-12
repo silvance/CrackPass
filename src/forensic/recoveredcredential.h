@@ -5,6 +5,7 @@
 #ifndef FORENSIC_RECOVEREDCREDENTIAL_H
 #define FORENSIC_RECOVEREDCREDENTIAL_H
 
+#include <QByteArray>
 #include <QDateTime>
 #include <QJsonObject>
 #include <QString>
@@ -25,7 +26,15 @@ struct RecoveredCredential
     QUuid evidenceId;
 
     QString hash;       // the cracked hash line
-    QString plaintext;  // the recovered password
+
+    // The recovered password. `rawPlaintext` holds the EXACT bytes (the forensic
+    // ground truth, preserved even when they are not valid UTF-8). `plaintext`
+    // is a best-effort display form: the decoded text when the bytes are valid
+    // UTF-8, otherwise the canonical, reversible $HEX[..] notation. `encoding`
+    // ("utf-8" or "raw") records which case applies.
+    QString plaintext;
+    QByteArray rawPlaintext;
+    QString encoding;
     QDateTime recoveredUtc;
 
     QJsonObject toJson() const;

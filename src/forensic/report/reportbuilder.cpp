@@ -77,6 +77,7 @@ RecoveryReport ReportBuilder::build(const CaseWorkspace &ws, const CrackingJob &
         if (c.jobId == job.id) {
             r.recovered = true;
             r.recoveredPlaintext = includePlaintext ? c.plaintext : QStringLiteral("[REDACTED]");
+            r.recoveredEncoding = c.encoding;
             r.recoveredHash = c.hash;
             r.recoveredUtc = c.recoveredUtc.toString(Qt::ISODateWithMs);
         }

@@ -16,6 +16,12 @@ QJsonObject RecoveredCredential::toJson() const
     obj[QStringLiteral("evidenceId")] = evidenceId.toString(QUuid::WithoutBraces);
     obj[QStringLiteral("hash")] = hash;
     obj[QStringLiteral("plaintext")] = plaintext;
+    // Store the exact recovered bytes as hex so no fidelity is lost through JSON
+    // (which cannot represent arbitrary bytes as a string).
+    if (!rawPlaintext.isEmpty())
+        obj[QStringLiteral("rawHex")] = QString::fromLatin1(rawPlaintext.toHex());
+    if (!encoding.isEmpty())
+        obj[QStringLiteral("encoding")] = encoding;
     obj[QStringLiteral("recoveredUtc")] = jsonutil::fromDateTime(recoveredUtc);
     return obj;
 }
@@ -29,6 +35,13 @@ RecoveredCredential RecoveredCredential::fromJson(const QJsonObject &obj)
     c.evidenceId = QUuid::fromString(obj.value(QStringLiteral("evidenceId")).toString());
     c.hash = obj.value(QStringLiteral("hash")).toString();
     c.plaintext = obj.value(QStringLiteral("plaintext")).toString();
+    if (obj.contains(QStringLiteral("rawHex")))
+        c.rawPlaintext = QByteArray::fromHex(obj.value(QStringLiteral("rawHex")).toString().toLatin1());
+    else
+        c.rawPlaintext = c.plaintext.toUtf8(); // legacy records: display was the password
+    c.encoding = obj.value(QStringLiteral("encoding")).toString();
+    if (c.encoding.isEmpty())
+        c.encoding = QStringLiteral("utf-8");
     c.recoveredUtc = jsonutil::toDateTime(obj.value(QStringLiteral("recoveredUtc")).toString());
     return c;
 }

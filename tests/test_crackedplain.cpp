@@ -25,38 +25,59 @@ private slots:
     void spacePassword();
     void unicodePassword();
     void literalDollarHexText();
+    void nonUtf8BytesPreservedLosslessly();
     void outfileFormatIsPlain();
 };
 
 void TestCrackedPlain::plainPassthrough()
 {
-    QCOMPARE(decodeHashcatPlain("hunter2"), QStringLiteral("hunter2"));
+    const DecodedPlain d = decodeHashcatPlain("hunter2");
+    QCOMPARE(d.display, QStringLiteral("hunter2"));
+    QCOMPARE(d.raw, QByteArray("hunter2"));
+    QCOMPARE(d.encoding, QStringLiteral("utf-8"));
 }
 
 void TestCrackedPlain::colonPassword()
 {
     // With plaintext-only outfile the colon is literal; and $HEX round-trips it.
-    QCOMPARE(decodeHashcatPlain("pass:word"), QStringLiteral("pass:word"));
-    QCOMPARE(decodeHashcatPlain(hexOf("pa:ss:wd")), QStringLiteral("pa:ss:wd"));
+    QCOMPARE(decodeHashcatPlain("pass:word").display, QStringLiteral("pass:word"));
+    const DecodedPlain d = decodeHashcatPlain(hexOf("pa:ss:wd"));
+    QCOMPARE(d.display, QStringLiteral("pa:ss:wd"));
+    QCOMPARE(d.raw, QByteArray("pa:ss:wd"));
 }
 
 void TestCrackedPlain::spacePassword()
 {
-    QCOMPARE(decodeHashcatPlain(hexOf("correct horse battery")),
+    QCOMPARE(decodeHashcatPlain(hexOf("correct horse battery")).display,
              QStringLiteral("correct horse battery"));
 }
 
 void TestCrackedPlain::unicodePassword()
 {
-    QCOMPARE(decodeHashcatPlain(hexOf(QString::fromUtf8("café𝔫🔑"))),
-             QString::fromUtf8("café𝔫🔑"));
+    const DecodedPlain d = decodeHashcatPlain(hexOf(QString::fromUtf8("café𝔫🔑")));
+    QCOMPARE(d.display, QString::fromUtf8("café𝔫🔑"));
+    QCOMPARE(d.raw, QString::fromUtf8("café𝔫🔑").toUtf8());
+    QCOMPARE(d.encoding, QStringLiteral("utf-8"));
 }
 
 void TestCrackedPlain::literalDollarHexText()
 {
     // A password that is not $HEX-wrapped is returned verbatim, even if it
     // merely looks similar.
-    QCOMPARE(decodeHashcatPlain("$dollar$word"), QStringLiteral("$dollar$word"));
+    QCOMPARE(decodeHashcatPlain("$dollar$word").display, QStringLiteral("$dollar$word"));
+}
+
+void TestCrackedPlain::nonUtf8BytesPreservedLosslessly()
+{
+    // A password whose bytes are not valid UTF-8 (e.g. Latin-1 "pä" as 0x70 0xE4)
+    // must survive as its exact bytes, shown in canonical $HEX[..] form.
+    const QByteArray rawBytes = QByteArray::fromHex("70e4");
+    const QString token = QStringLiteral("$HEX[") + QString::fromLatin1(rawBytes.toHex()) + QLatin1Char(']');
+    const DecodedPlain d = decodeHashcatPlain(token);
+    QCOMPARE(d.raw, rawBytes);                       // exact bytes preserved
+    QCOMPARE(d.encoding, QStringLiteral("raw"));
+    QCOMPARE(d.display, QStringLiteral("$HEX[70e4]")); // reversible, not mangled
+    QVERIFY(!d.display.contains(QChar(QChar::ReplacementCharacter)));
 }
 
 void TestCrackedPlain::outfileFormatIsPlain()

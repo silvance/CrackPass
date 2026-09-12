@@ -19,6 +19,8 @@ class TestDataModels : public QObject
 private slots:
     void crackingJobRoundTrip();
     void recoveredCredentialRoundTrip();
+    void nonUtf8CredentialRoundTrip();
+    void legacyCredentialWithoutRawBytes();
     void runtimeComputation();
 };
 
@@ -59,6 +61,8 @@ void TestDataModels::recoveredCredentialRoundTrip()
     c.evidenceId = QUuid::createUuid();
     c.hash = "$pdf$...";
     c.plaintext = "hunter2";
+    c.rawPlaintext = QByteArray("hunter2");
+    c.encoding = "utf-8";
     c.recoveredUtc = QDateTime::currentDateTimeUtc();
 
     const RecoveredCredential back = RecoveredCredential::fromJson(c.toJson());
@@ -67,6 +71,40 @@ void TestDataModels::recoveredCredentialRoundTrip()
     QCOMPARE(back.evidenceId, c.evidenceId);
     QCOMPARE(back.hash, c.hash);
     QCOMPARE(back.plaintext, c.plaintext);
+    QCOMPARE(back.rawPlaintext, c.rawPlaintext);
+    QCOMPARE(back.encoding, c.encoding);
+}
+
+void TestDataModels::nonUtf8CredentialRoundTrip()
+{
+    // A password whose bytes are not valid UTF-8 must survive persistence
+    // exactly, via the rawHex field.
+    RecoveredCredential c;
+    c.id = QUuid::createUuid();
+    c.hash = "$pdf$...";
+    c.rawPlaintext = QByteArray::fromHex("70e4ff"); // not valid UTF-8
+    c.plaintext = QStringLiteral("$HEX[70e4ff]");
+    c.encoding = "raw";
+    c.recoveredUtc = QDateTime::currentDateTimeUtc();
+
+    const RecoveredCredential back = RecoveredCredential::fromJson(c.toJson());
+    QCOMPARE(back.rawPlaintext, c.rawPlaintext); // exact bytes preserved
+    QCOMPARE(back.plaintext, c.plaintext);
+    QCOMPARE(back.encoding, QStringLiteral("raw"));
+}
+
+void TestDataModels::legacyCredentialWithoutRawBytes()
+{
+    // A record written before raw bytes were tracked (plaintext only) still
+    // loads, with rawPlaintext reconstructed from the display text.
+    QJsonObject obj;
+    obj[QStringLiteral("id")] = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    obj[QStringLiteral("hash")] = QStringLiteral("$pdf$...");
+    obj[QStringLiteral("plaintext")] = QStringLiteral("legacypw");
+    const RecoveredCredential back = RecoveredCredential::fromJson(obj);
+    QCOMPARE(back.plaintext, QStringLiteral("legacypw"));
+    QCOMPARE(back.rawPlaintext, QByteArray("legacypw"));
+    QCOMPARE(back.encoding, QStringLiteral("utf-8"));
 }
 
 void TestDataModels::runtimeComputation()

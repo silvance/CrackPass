@@ -61,7 +61,7 @@ signals:
 private slots:
     void onRunning(const QUuid &jobId);
     void onStatus(const QUuid &jobId, const forensic::HashcatStatus &status);
-    void onCracked(const QUuid &jobId, const QString &hash, const QString &plaintext);
+    void onCracked(const QUuid &jobId, const QString &hash, const QByteArray &rawPlaintext);
     void onPaused(const QUuid &jobId);
     void onStopped(const QUuid &jobId);
     void onFinished(const QUuid &jobId, int exitCode, int hashcatStatusCode);

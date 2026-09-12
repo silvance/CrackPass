@@ -4,6 +4,8 @@
  */
 #include "jobqueue.h"
 
+#include "crackedplain.h"
+
 #include <QDateTime>
 
 namespace forensic {
@@ -107,12 +109,15 @@ void JobQueue::onStatus(const QUuid &jobId, const HashcatStatus &status)
     emit jobStatus(jobId, status);
 }
 
-void JobQueue::onCracked(const QUuid &jobId, const QString &hash, const QString &plaintext)
+void JobQueue::onCracked(const QUuid &jobId, const QString &hash, const QByteArray &rawPlaintext)
 {
     const int i = indexOf(jobId);
     if (i < 0)
         return;
     m_recoveredFlag.insert(jobId, true);
+
+    // Preserve the exact recovered bytes; derive the display form + encoding.
+    const DecodedPlain decoded = classifyPlainBytes(rawPlaintext);
 
     RecoveredCredential cred;
     cred.id = QUuid::createUuid();
@@ -120,7 +125,9 @@ void JobQueue::onCracked(const QUuid &jobId, const QString &hash, const QString 
     cred.jobId = jobId;
     cred.evidenceId = m_jobs.at(i).evidenceId;
     cred.hash = hash;
-    cred.plaintext = plaintext;
+    cred.plaintext = decoded.display;
+    cred.rawPlaintext = decoded.raw;
+    cred.encoding = decoded.encoding;
     cred.recoveredUtc = QDateTime::currentDateTimeUtc();
     emit credentialRecovered(cred);
 
