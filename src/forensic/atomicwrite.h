@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  *
  * Atomic whole-file writes for case state. A crash or power loss must not leave
  * case.json / job.json / extraction.json / recovered.json half-written, so

@@ -1,8 +1,8 @@
-# CrackPass — real-tool integration testing
+# CaseKey — real-tool integration testing
 
 The unit tests use a fake process runner and never touch real tools. This
 **optional** integration layer exercises the *actual* hashcat and John the
-Ripper Jumbo binaries deployed in your lab, to prove CrackPass interoperates
+Ripper Jumbo binaries deployed in your lab, to prove CaseKey interoperates
 with those specific versions — not just with internal mocks. It uses **no
 network access**.
 
@@ -41,10 +41,10 @@ detection must still identify it correctly).
 # 1. Generate (or hand-assemble) the corpus with your installed tools:
 python3 tests/integration/generate_corpus.py C:\cases\corpus
 
-# 2. Point CrackPass at the tools and corpus:
-set CRACKPASS_HASHCAT=C:\CrackPass\tools\hashcat\hashcat.exe
-set CRACKPASS_TOOLS_DIR=C:\CrackPass\tools\john\run
-set CRACKPASS_CORPUS=C:\cases\corpus
+# 2. Point CaseKey at the tools and corpus:
+set CASEKEY_HASHCAT=C:\CaseKey\tools\hashcat\hashcat.exe
+set CASEKEY_TOOLS_DIR=C:\CaseKey\tools\john\run
+set CASEKEY_CORPUS=C:\cases\corpus
 
 # 3a. Run as part of the test suite:
 ctest --test-dir build -R test_integration --output-on-failure
@@ -71,4 +71,4 @@ wordlist recovers them quickly.
 
 ## Disable entirely
 
-`cmake -B build -DCRACKPASS_BUILD_INTEGRATION=OFF`
+`cmake -B build -DCASEKEY_BUILD_INTEGRATION=OFF`

@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  */
 #ifndef UI_FORENSICSETTINGSDIALOG_H
 #define UI_FORENSICSETTINGSDIALOG_H

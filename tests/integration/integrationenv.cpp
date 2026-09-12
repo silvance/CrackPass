@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  */
 #include "integrationenv.h"
 
@@ -22,7 +22,7 @@ QString envValue(const char *key)
     return QProcessEnvironment::systemEnvironment().value(QString::fromLatin1(key));
 }
 
-// Resolve a *2john tool from CRACKPASS_TOOLS_DIR or PATH. Handles native
+// Resolve a *2john tool from CASEKEY_TOOLS_DIR or PATH. Handles native
 // executables and .py/.pl scripts (recording the interpreter dependency).
 ToolInfo resolveExtractor(const QString &id, const QString &toolsDir)
 {
@@ -89,7 +89,7 @@ IntegrationEnv IntegrationEnv::detect()
 {
     IntegrationEnv env;
 
-    QString hcPath = envValue("CRACKPASS_HASHCAT");
+    QString hcPath = envValue("CASEKEY_HASHCAT");
     if (hcPath.isEmpty())
         hcPath = QStandardPaths::findExecutable(QStringLiteral("hashcat"));
     if (!hcPath.isEmpty() && QFileInfo::exists(hcPath)) {
@@ -102,12 +102,12 @@ IntegrationEnv IntegrationEnv::detect()
         env.hashcatBackendInfo = IntegrationEnv::runCapture(hcPath, {QStringLiteral("-I")}, 10000);
     }
 
-    const QString toolsDir = envValue("CRACKPASS_TOOLS_DIR");
+    const QString toolsDir = envValue("CASEKEY_TOOLS_DIR");
     for (const char *id : kExtractorIds)
         env.extractors.insert(QString::fromLatin1(id),
                               resolveExtractor(QString::fromLatin1(id), toolsDir));
 
-    env.corpusDir = envValue("CRACKPASS_CORPUS");
+    env.corpusDir = envValue("CASEKEY_CORPUS");
     return env;
 }
 

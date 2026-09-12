@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  */
 #include "attackplannerdialog.h"
 
@@ -264,5 +264,5 @@ void AttackPlannerDialog::updatePreview()
 
     m_command->setPlainText(p.command.join(QLatin1Char(' ')));
     m_status->setText(tr("This is a preview only. No attack is started. Review the command, "
-                         "then run it from Advanced Hashcat Mode."));
+                         "then run it from Advanced Mode."));
 }

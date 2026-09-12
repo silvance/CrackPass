@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  */
 #ifndef UI_DEPENDENCYDOCTORDIALOG_H
 #define UI_DEPENDENCYDOCTORDIALOG_H
@@ -11,7 +11,7 @@ class QTreeWidget;
 
 /*
  * "System / Tool Status" (Dependency Doctor): shows the detected forensic
- * toolchain and resources so an examiner can deploy and operate CrackPass
+ * toolchain and resources so an examiner can deploy and operate CaseKey
  * without understanding the internals. Read-only; a Re-scan button re-probes.
  */
 class DependencyDoctorDialog : public QDialog

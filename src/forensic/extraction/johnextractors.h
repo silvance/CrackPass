@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  *
  * Concrete *2john adapters, one per artifact/extractor type. Each maps a
  * single artifact type to its extraction tool and hash->mode resolution.

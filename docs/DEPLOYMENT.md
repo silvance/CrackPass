@@ -1,21 +1,21 @@
-# CrackPass — Deployment on a disconnected Windows forensic workstation
+# CaseKey — Deployment on a disconnected Windows forensic workstation
 
-CrackPass is designed to run **fully offline** on an examiner workstation. It has
+CaseKey is designed to run **fully offline** on an examiner workstation. It has
 **no cloud dependencies**: no telemetry, no update checks, no network calls. All
 compute happens locally on the workstation's CPU/GPU. This document describes how
-to locate, bundle and configure the third-party components CrackPass drives.
+to locate, bundle and configure the third-party components CaseKey drives.
 
-> CrackPass is an orchestration GUI. It does **not** ship or replace hashcat or
+> CaseKey is an orchestration GUI. It does **not** ship or replace hashcat or
 > John the Ripper. On a licensed forensic workstation the examiner supplies those
-> engines; CrackPass locates or bundles them and records exactly what it used.
+> engines; CaseKey locates or bundles them and records exactly what it used.
 
 ## 1. Components to provide
 
-| Component | Purpose | How CrackPass finds it |
+| Component | Purpose | How CaseKey finds it |
 | --- | --- | --- |
 | **hashcat** (v7.x) | The cracking engine | Path configured in Settings (`hashcatPath`); invoked attached with `--status-json` |
 | **John the Ripper Jumbo** `*2john` utilities | Hash extraction from encrypted files/containers | Per-tool path configured under settings keys `tools/<id>` (`office2john`, `pdf2john`, `zip2john`, `rar2john`, `7z2john`, `keepass2john`) |
-| **Runtime libraries** | Qt 6 + UCRT runtime for the GUI itself | Bundled next to `hashcat-gui.exe` by `windeployqt6` (see the release workflow) |
+| **Runtime libraries** | Qt 6 + UCRT runtime for the GUI itself | Bundled next to `casekey.exe` by `windeployqt6` (see the release workflow) |
 | **Default rules** | Rule files for the "Wordlist + Rules" template | Bundled read-only under `tools/rules/` (e.g. hashcat's `rules/best64.rule`) |
 | **Approved wordlists** | Dictionaries for dictionary/hybrid attacks | Placed on the workstation; selected per-plan, or set a default `commonWordlist` path |
 
@@ -25,8 +25,8 @@ A self-contained, portable install directory (nothing is written outside it exce
 case folders the examiner chooses):
 
 ```
-CrackPass\
-  hashcat-gui.exe
+CaseKey\
+  casekey.exe
   Qt6*.dll, platforms\, styles\   # from windeployqt6
   ucrt\ or vc_redist runtime       # UCRT dependencies
   tools\
@@ -35,7 +35,7 @@ CrackPass\
     john\run\*2john(.exe|.pl|.py)  # JtR Jumbo extraction utilities
     rules\best64.rule , dive.rule , ...
   wordlists\
-    <approved wordlists>.txt        # provided per policy; not shipped by CrackPass
+    <approved wordlists>.txt        # provided per policy; not shipped by CaseKey
   docs\
     README.md CHANGELOG.md FAQ.md LICENSE THIRD_PARTY.md
 ```
@@ -48,9 +48,9 @@ dependency on the disconnected workstation.
 
 ## 3. First-run configuration (offline)
 
-1. Launch `hashcat-gui.exe` and choose **Advanced Hashcat Mode → Settings** to set
+1. Launch `casekey.exe` and choose **Advanced Mode → Settings** to set
    the **hashcat** path.
-2. Set each extractor tool path (settings keys `tools/<id>`). CrackPass records the
+2. Set each extractor tool path (settings keys `tools/<id>`). CaseKey records the
    resolved program and, where available, its version into every extraction record.
 3. (Optional) Set a default common-passwords wordlist path and point the planner at
    your approved wordlists / bundled rules.

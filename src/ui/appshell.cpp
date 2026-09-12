@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  */
 #include "appshell.h"
 
@@ -15,11 +15,11 @@
 AppShell::AppShell(QWidget *parent)
     : QWidget(parent)
 {
-    setWindowTitle(tr("CrackPass"));
+    setWindowTitle(tr("CaseKey"));
 
     auto *layout = new QVBoxLayout(this);
 
-    auto *title = new QLabel(tr("<h2>CrackPass</h2><p>Select a workflow.</p>"), this);
+    auto *title = new QLabel(tr("<h2>CaseKey</h2><p>Select a workflow.</p>"), this);
     title->setTextFormat(Qt::RichText);
     layout->addWidget(title);
 
@@ -29,9 +29,9 @@ AppShell::AppShell(QWidget *parent)
     connect(forensicButton, &QPushButton::clicked, this, &AppShell::openForensicMode);
     layout->addWidget(forensicButton);
 
-    auto *advancedButton = new QPushButton(tr("Advanced Hashcat Mode"), this);
+    auto *advancedButton = new QPushButton(tr("Advanced Mode"), this);
     advancedButton->setMinimumHeight(48);
-    advancedButton->setToolTip(tr("The existing low-level hashcat GUI."));
+    advancedButton->setToolTip(tr("Full low-level control of the underlying cracking engine."));
     connect(advancedButton, &QPushButton::clicked, this, &AppShell::openAdvancedMode);
     layout->addWidget(advancedButton);
 

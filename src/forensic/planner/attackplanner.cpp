@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  */
 #include "attackplanner.h"
 #include "attackcommandbuilder.h"
@@ -163,7 +163,7 @@ PlanResult AttackPlanner::plan(AttackTemplate templ, const CaseKnowledge &knowle
         spec.attackMode = AttackModeNum::Straight;
         spec.extraArgs = ctx.customArgs;
         spec.notes = QStringLiteral(
-            "Pass-through: edit freely here or in Advanced Hashcat Mode.");
+            "Pass-through: edit freely here or in Advanced Mode.");
         break;
     }
     }

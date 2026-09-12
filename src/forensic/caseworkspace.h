@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  */
 #ifndef FORENSIC_CASEWORKSPACE_H
 #define FORENSIC_CASEWORKSPACE_H
@@ -52,7 +52,7 @@ public:
     IntakeResult addEvidence(const QString &sourcePath,
                              EvidenceStorageMode mode = EvidenceStorageMode::Referenced);
 
-    // Absolute path CrackPass reads for this artifact (working copy if imported,
+    // Absolute path CaseKey reads for this artifact (working copy if imported,
     // else the referenced original).
     QString evidenceReadPath(const EvidenceItem &item) const;
 

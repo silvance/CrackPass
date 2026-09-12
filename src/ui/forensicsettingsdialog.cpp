@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  */
 #include "forensicsettingsdialog.h"
 #include "settingsmanager.h"
@@ -22,7 +22,7 @@ ForensicSettingsDialog::ForensicSettingsDialog(QWidget *parent)
     resize(700, 520);
     auto *root = new QVBoxLayout(this);
 
-    root->addWidget(new QLabel(tr("Configure the external tools and resources CrackPass uses. "
+    root->addWidget(new QLabel(tr("Configure the external tools and resources CaseKey uses. "
                                   "Leave a field blank to fall back to the bundled tools/ layout or PATH."), this));
 
     auto *engine = new QGroupBox(tr("Cracking engine"), this);

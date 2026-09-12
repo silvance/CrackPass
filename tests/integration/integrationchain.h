@@ -1,9 +1,9 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  */
-#ifndef CRACKPASS_INTEGRATIONCHAIN_H
-#define CRACKPASS_INTEGRATIONCHAIN_H
+#ifndef CASEKEY_INTEGRATIONCHAIN_H
+#define CASEKEY_INTEGRATIONCHAIN_H
 
 #include "integrationenv.h"
 #include <QString>
@@ -48,4 +48,4 @@ QVector<FixtureSpec> loadCorpus(const QString &dir);
 
 }} // namespace forensic::itest
 
-#endif // CRACKPASS_INTEGRATIONCHAIN_H
+#endif // CASEKEY_INTEGRATIONCHAIN_H

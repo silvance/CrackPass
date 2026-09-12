@@ -14,7 +14,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>hashcat-gui</string>
+   <string>CaseKey</string>
   </property>
   <property name="windowIcon">
    <iconset resource="resources.qrc">

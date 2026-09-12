@@ -1,6 +1,6 @@
-# CrackPass — Forensic validation & enforced invariants
+# CaseKey — Forensic validation & enforced invariants
 
-This document records the correctness/reliability invariants CrackPass enforces
+This document records the correctness/reliability invariants CaseKey enforces
 after the forensic audit. The guiding principle is that **a silent error is
 worse than an explicit failure**: operations refuse to proceed rather than
 continue on unverifiable state.
@@ -10,7 +10,7 @@ continue on unverifiable state.
 - The original artifact is **never modified**. It is opened read-only for
   hashing and extraction.
 - A SHA-256 is computed at intake and stored on the evidence record.
-- **Before any re-read** (currently: hash extraction), CrackPass recomputes the
+- **Before any re-read** (currently: hash extraction), CaseKey recomputes the
   SHA-256 and compares it to the intake value. On mismatch or an unreadable
   artifact it **fails loudly** (no extraction) and records `integrity_mismatch`
   / `integrity_check_failed` in the audit log.
@@ -60,7 +60,7 @@ continue on unverifiable state.
 
 ## 5. Pause / stop / resume semantics
 
-hashcat has no reliable out-of-console live "pause", so CrackPass uses hashcat's
+hashcat has no reliable out-of-console live "pause", so CaseKey uses hashcat's
 supported **session/restore** mechanism and distinguishes:
 
 - **Graceful stop** — `QProcess::terminate()` (SIGTERM). hashcat aborts and
@@ -71,7 +71,7 @@ supported **session/restore** mechanism and distinguishes:
   (10 s) a `kill()` follows so a hung process cannot wedge the queue. No restore
   is guaranteed in this forced case.
 - **Resume** — relaunch with `--session <name> --restore`, which reloads the
-  original attack; CrackPass does not re-supply the attack positionals.
+  original attack; CaseKey does not re-supply the attack positionals.
 
 > Known limitation: on Windows, delivering a graceful signal to a console
 > process may require a Ctrl-C/`GenerateConsoleCtrlEvent` path; until that is

@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  */
 #ifndef FORENSIC_ENCRYPTIONPROBE_H
 #define FORENSIC_ENCRYPTIONPROBE_H
