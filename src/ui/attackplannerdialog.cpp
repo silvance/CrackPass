@@ -5,6 +5,7 @@
 #include "attackplannerdialog.h"
 
 #include "forensic/planner/attackcommandbuilder.h"
+#include "forensic/planner/knowledgematerializer.h"
 
 #include <QProcess>
 #include <QRegularExpression>
@@ -86,6 +87,10 @@ AttackPlannerDialog::AttackPlannerDialog(quint32 hashMode, const QString &hashTy
     m_suffix = new QLineEdit(this);
     form->addRow(tr("Known prefix:"), m_prefix);
     form->addRow(tr("Known suffix:"), m_suffix);
+
+    m_knownPositions = new QLineEdit(this);
+    m_knownPositions->setPlaceholderText(tr("0-based, e.g. 0:P, 3:!, 5:a"));
+    form->addRow(tr("Known positions:"), m_knownPositions);
 
     auto *clsRow = new QHBoxLayout;
     m_clsLower = new QCheckBox(tr("lower"), this);
@@ -182,6 +187,7 @@ CaseKnowledge AttackPlannerDialog::collectKnowledge() const
     k.maxLength = m_maxLen->value() > 0 ? m_maxLen->value() : -1;
     k.knownPrefix = m_prefix->text();
     k.knownSuffix = m_suffix->text();
+    k.knownPositions = KnowledgeMaterializer::parseKnownPositions(m_knownPositions->text());
     if (m_clsLower->isChecked())   k.requiredClasses |= CharClass::Lower;
     if (m_clsUpper->isChecked())   k.requiredClasses |= CharClass::Upper;
     if (m_clsDigit->isChecked())   k.requiredClasses |= CharClass::Digit;
