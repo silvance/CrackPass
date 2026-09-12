@@ -30,6 +30,7 @@ private slots:
     void detectsPdf();
     void detectsKeePass();
     void detectsZip();
+    void detectsBitLocker();
     void unknownForRandomBytes();
 };
 
@@ -55,6 +56,18 @@ void TestArtifactAnalyzer::detectsZip()
     auto reg = ArtifactAnalyzerRegistry::withBuiltins();
     const QString path = writeBytes(dir, "a.zip", QByteArray("\x50\x4b\x03\x04rest of zip", 15));
     QCOMPARE(reg.identify(path).id, QStringLiteral("zip"));
+}
+
+void TestArtifactAnalyzer::detectsBitLocker()
+{
+    QTemporaryDir dir;
+    auto reg = ArtifactAnalyzerRegistry::withBuiltins();
+    // The FVE signature "-FVE-FS-" sits at offset 3 in the volume header.
+    QByteArray vol("\xEB\x58\x90", 3); // 3 leading bytes (jump instruction)
+    vol.append("-FVE-FS-");
+    vol.append(QByteArray(64, '\0'));
+    const QString path = writeBytes(dir, "volume.bin", vol);
+    QCOMPARE(reg.identify(path).id, QStringLiteral("bitlocker"));
 }
 
 void TestArtifactAnalyzer::unknownForRandomBytes()

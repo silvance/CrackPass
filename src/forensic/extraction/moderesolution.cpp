@@ -109,5 +109,14 @@ QVector<HashcatModeOption> forKeePass(const QString &hash)
     return {};
 }
 
+QVector<HashcatModeOption> forBitLocker(const QString &hash)
+{
+    // bitlocker2john emits several $bitlocker$<type>$... lines (user password,
+    // recovery password, etc.); hashcat mode 22100 covers them all.
+    if (hash.startsWith(QStringLiteral("$bitlocker$")))
+        return {opt(22100, "BitLocker")};
+    return {};
+}
+
 } // namespace modes
 } // namespace forensic

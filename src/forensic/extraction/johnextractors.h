@@ -40,6 +40,31 @@ FORENSIC_JOHN_EXTRACTOR(KeePassHashExtractor,  "keepass2john",  "KeePass (keepas
 
 #undef FORENSIC_JOHN_EXTRACTOR
 
+// BitLocker is handled separately from the macro: bitlocker2john takes its input
+// via "-i <image>" rather than positionally, and the input is an encrypted
+// volume/image rather than a document.
+class BitLockerHashExtractor : public John2HashExtractor
+{
+public:
+    QString id() const override { return QStringLiteral("bitlocker2john"); }
+    QString displayName() const override { return QStringLiteral("BitLocker (bitlocker2john)"); }
+    QString toolId() const override { return QStringLiteral("bitlocker2john"); }
+    bool supports(const ArtifactType &t) const override
+    {
+        return t.id == QStringLiteral("bitlocker");
+    }
+
+protected:
+    QVector<HashcatModeOption> resolveModes(const QString &hash) const override
+    {
+        return modes::forBitLocker(hash);
+    }
+    QStringList inputArgs(const QString &inputPath) const override
+    {
+        return {QStringLiteral("-i"), inputPath};
+    }
+};
+
 } // namespace forensic
 
 #endif // FORENSIC_JOHNEXTRACTORS_H

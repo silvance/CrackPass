@@ -16,6 +16,8 @@ EncryptionState EncryptionProbe::probe(const ArtifactType &type, const QString &
         return probePdf(filePath);
     if (type.id == QStringLiteral("keepass-kdbx"))
         return EncryptionState::Encrypted; // a KeePass database is always encrypted
+    if (type.id == QStringLiteral("bitlocker"))
+        return EncryptionState::Encrypted; // the FVE signature means the volume is encrypted
     return EncryptionState::Unknown;
 }
 

@@ -23,7 +23,8 @@ DependencyProbe::DependencyProbe(ProcessRunner *runner, QString appDir, SettingL
 QStringList DependencyProbe::extractorIds()
 {
     return {QStringLiteral("office2john"), QStringLiteral("pdf2john"), QStringLiteral("zip2john"),
-            QStringLiteral("rar2john"), QStringLiteral("7z2john"), QStringLiteral("keepass2john")};
+            QStringLiteral("rar2john"), QStringLiteral("7z2john"), QStringLiteral("keepass2john"),
+            QStringLiteral("bitlocker2john")};
 }
 
 namespace {

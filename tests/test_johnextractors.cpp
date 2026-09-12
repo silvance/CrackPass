@@ -39,6 +39,7 @@ private slots:
     void noHashProduced();
     void launchFailure();
     void argvUsesOriginalPathReadOnly();
+    void bitlockerUsesInputFlagAndResolvesMode();
 };
 
 void TestJohnExtractors::normalizeStripsFilenamePrefix()
@@ -112,6 +113,28 @@ void TestJohnExtractors::argvUsesOriginalPathReadOnly()
     ex.extract(pdfItem(), ctxWith(runner, tools));
     QCOMPARE(runner.lastProgram, QStringLiteral("python"));
     QCOMPARE(runner.lastArgs, (QStringList{"pdf2john.py", "/evidence/secret.pdf"}));
+}
+
+void TestJohnExtractors::bitlockerUsesInputFlagAndResolvesMode()
+{
+    EvidenceItem e;
+    e.id = QUuid::createUuid();
+    e.originalPath = QStringLiteral("/evidence/disk.raw");
+    e.type = ArtifactType{"bitlocker", "BitLocker volume", 0.97};
+
+    FakeProcessRunner runner;
+    runner.nextResult = FakeProcessRunner::ok("disk.raw:$bitlocker$0$16$aaaa$...\n");
+    ToolResolver tools;
+    tools.setTool("bitlocker2john", ResolvedTool{true, "bitlocker2john", {}, ""});
+
+    BitLockerHashExtractor ex;
+    const ExtractionResult r = ex.extract(e, ctxWith(runner, tools));
+    QCOMPARE(r.status, ExtractionStatus::Success);
+    QCOMPARE(r.hash, QStringLiteral("$bitlocker$0$16$aaaa$..."));
+    QCOMPARE(r.candidateModes.size(), 1);
+    QCOMPARE(r.candidateModes.first().mode, 22100u);
+    // bitlocker2john takes its input via -i, not positionally.
+    QCOMPARE(runner.lastArgs, (QStringList{"-i", "/evidence/disk.raw"}));
 }
 
 QTEST_GUILESS_MAIN(TestJohnExtractors)

@@ -40,6 +40,7 @@ ExtractorRegistry ExtractorRegistry::withBuiltins()
     registry.registerExtractor(std::make_shared<RarHashExtractor>());
     registry.registerExtractor(std::make_shared<SevenZipHashExtractor>());
     registry.registerExtractor(std::make_shared<KeePassHashExtractor>());
+    registry.registerExtractor(std::make_shared<BitLockerHashExtractor>());
     return registry;
 }
 

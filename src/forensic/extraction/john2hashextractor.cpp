@@ -44,7 +44,7 @@ ExtractionResult John2HashExtractor::extract(const EvidenceItem &item, const Ext
     }
 
     QStringList args = tool.prefixArgs;
-    args << item.originalPath; // read-only input; the tool never writes to it
+    args << inputArgs(item.originalPath); // read-only input; the tool never writes to it
 
     result.toolProgram = tool.program;
     result.argv = args;

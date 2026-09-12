@@ -33,8 +33,8 @@ Full credit for the underlying GUI goes to the upstream project and its authors.
 
 ## Status & scope
 
-- Supported extraction formats (initial set): Microsoft Office, PDF, ZIP, RAR,
-  7-Zip, KeePass.
+- Supported extraction formats: Microsoft Office, PDF, ZIP, RAR, 7-Zip, KeePass,
+  and BitLocker volumes (via `bitlocker2john`, hashcat mode 22100).
 - ✅ Compatible with hashcat v7.x.
 - CaseKey orchestrates external tools; it does **not** bundle or replace
   hashcat or John the Ripper. See `docs/DEPLOYMENT.md` for how to provide them.

@@ -8,6 +8,9 @@
 #include "forensic/hashextractor.h"
 #include "hashcatmodes.h"
 
+#include <QString>
+#include <QStringList>
+
 namespace forensic {
 
 /*
@@ -31,6 +34,10 @@ public:
 protected:
     // Map a normalized hash to candidate hashcat modes (empty = unrecognized).
     virtual QVector<HashcatModeOption> resolveModes(const QString &hash) const = 0;
+
+    // How the input path is passed to the tool. Most *2john utilities take the
+    // file positionally; some (e.g. bitlocker2john) require a flag like "-i".
+    virtual QStringList inputArgs(const QString &inputPath) const { return {inputPath}; }
 };
 
 } // namespace forensic
