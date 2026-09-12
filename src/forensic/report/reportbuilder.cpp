@@ -12,7 +12,7 @@
 namespace forensic {
 
 RecoveryReport ReportBuilder::build(const CaseWorkspace &ws, const CrackingJob &job,
-                                    const QString &applicationVersion)
+                                    const QString &applicationVersion, bool includePlaintext)
 {
     RecoveryReport r;
     r.applicationVersion = applicationVersion;
@@ -76,7 +76,7 @@ RecoveryReport ReportBuilder::build(const CaseWorkspace &ws, const CrackingJob &
     for (const RecoveredCredential &c : ws.recoveredCredentials()) {
         if (c.jobId == job.id) {
             r.recovered = true;
-            r.recoveredPlaintext = c.plaintext;
+            r.recoveredPlaintext = includePlaintext ? c.plaintext : QStringLiteral("[REDACTED]");
             r.recoveredHash = c.hash;
             r.recoveredUtc = c.recoveredUtc.toString(Qt::ISODateWithMs);
         }

@@ -48,15 +48,18 @@ public:
 
     // Append a new event; computes its hash, links it to the current head,
     // writes it to disk, and returns the stored event.
-    AuditEvent append(const QString &actor, const QString &action,
-                      const QString &entityType, const QString &entityId,
-                      const QJsonObject &details);
+    // Appends an event. Returns false WITHOUT advancing the in-memory chain if
+    // the event could not be persisted; the error is available via lastError().
+    bool append(const QString &actor, const QString &action,
+                const QString &entityType, const QString &entityId,
+                const QJsonObject &details);
 
     // Recompute the whole chain and confirm hashes + linkage are intact.
     bool verify(QString *error = nullptr) const;
 
     QList<AuditEvent> events() const { return m_events; }
     QString headHash() const { return m_headHash; }
+    QString lastError() const { return m_lastError; }
     QString filePath() const { return m_filePath; }
 
     // Exposed so tests and verify() agree on the hashing scheme.
@@ -66,6 +69,7 @@ private:
     QString m_filePath;
     QList<AuditEvent> m_events;
     QString m_headHash;
+    QString m_lastError;
 };
 
 } // namespace forensic

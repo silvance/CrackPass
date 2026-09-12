@@ -13,6 +13,16 @@
 
 namespace forensic {
 
+// How the case holds the artifact bytes. The model supports both from the
+// start; the workflow currently defaults to Referenced.
+enum class EvidenceStorageMode {
+    Referenced,  // original file left in place; read from originalPath
+    WorkingCopy, // an immutable copy imported into the case; read from workingCopyPath
+};
+
+QString evidenceStorageModeToString(EvidenceStorageMode mode);
+EvidenceStorageMode evidenceStorageModeFromString(const QString &s);
+
 /*
  * A source artifact submitted to a case.
  *
@@ -35,6 +45,9 @@ struct EvidenceItem
     QDateTime accessedUtc;
 
     QString sha256;         // lowercase hex, computed read-only at intake
+
+    EvidenceStorageMode storageMode = EvidenceStorageMode::Referenced;
+    QString workingCopyPath; // relative-to-case path when storageMode == WorkingCopy
     QDateTime importedUtc;  // when it was added to the case
 
     ArtifactType type;      // detected artifact type

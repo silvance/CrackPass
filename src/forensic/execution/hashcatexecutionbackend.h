@@ -6,6 +6,7 @@
 #define FORENSIC_HASHCATEXECUTIONBACKEND_H
 
 #include "jobexecutionbackend.h"
+#include "hashcatstatusstream.h"
 #include <QHash>
 #include <QString>
 
@@ -41,11 +42,15 @@ private:
         StartOptions opts;
         CrackingJob job;
         int lastStatusCode = -1;
+        HashcatStatusStream statusStream;
         int emittedCredLines = 0;
+        QString targetHash;
         Pending pending = Pending::None;
     };
 
     void launch(const QUuid &jobId, bool restore);
+    void requestShutdown(const QUuid &jobId, Pending kind);
+    static constexpr int kGraceMs = 10000; // grace before a forced kill
     void drainStatus(const QUuid &jobId);
     void drainCredentials(const QUuid &jobId);
 

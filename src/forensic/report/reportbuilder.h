@@ -21,8 +21,10 @@ class CaseWorkspace;
 class ReportBuilder
 {
 public:
+    // includePlaintext=false redacts the recovered password in the report
+    // (both HTML and JSON), while retaining the fact of recovery.
     static RecoveryReport build(const CaseWorkspace &ws, const CrackingJob &job,
-                                const QString &applicationVersion);
+                                const QString &applicationVersion, bool includePlaintext = true);
 };
 
 } // namespace forensic

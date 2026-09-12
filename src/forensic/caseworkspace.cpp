@@ -5,6 +5,8 @@
 #include "caseworkspace.h"
 
 #include "extraction/toolresolver.h"
+#include "atomicwrite.h"
+#include "hashingservice.h"
 
 
 #include <QDir>
@@ -15,6 +17,20 @@
 #include <QUuid>
 
 namespace forensic {
+
+bool CaseWorkspace::appendAudit(const QString &action, const QString &entityType,
+                                const QString &entityId, const QJsonObject &details, QString *error)
+{
+    if (!m_audit)
+        return true;
+    const QString actor = m_info.examiner.isEmpty() ? QStringLiteral("system") : m_info.examiner;
+    if (!m_audit->append(actor, action, entityType, entityId, details)) {
+        if (error)
+            *error = QStringLiteral("Audit write failed: %1").arg(m_audit->lastError());
+        return false;
+    }
+    return true;
+}
 
 namespace {
 
@@ -92,8 +108,8 @@ std::unique_ptr<CaseWorkspace> CaseWorkspace::create(const QString &parentDir, c
     QJsonObject details;
     details[QStringLiteral("name")] = ci.name;
     details[QStringLiteral("examiner")] = ci.examiner;
-    ws->m_audit->append(ci.examiner.isEmpty() ? QStringLiteral("system") : ci.examiner,
-                        QStringLiteral("case_created"), QStringLiteral("case"), ci.id, details);
+    if (!ws->appendAudit(QStringLiteral("case_created"), QStringLiteral("case"), ci.id, details, error))
+        return nullptr;
 
     return ws;
 }
@@ -135,13 +151,7 @@ std::unique_ptr<CaseWorkspace> CaseWorkspace::open(const QString &caseDir, QStri
 bool CaseWorkspace::writeCaseManifest(QString *error) const
 {
     const QString path = QDir(m_rootPath).filePath(QStringLiteral("case.json"));
-    QFile f(path);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        if (error) *error = QStringLiteral("Cannot write case.json: %1").arg(f.errorString());
-        return false;
-    }
-    f.write(QJsonDocument(m_info.toJson()).toJson(QJsonDocument::Indented));
-    return true;
+    return writeFileAtomic(path, QJsonDocument(m_info.toJson()).toJson(QJsonDocument::Indented), error);
 }
 
 bool CaseWorkspace::loadEvidence(QString *error)
@@ -173,21 +183,45 @@ bool CaseWorkspace::persistEvidence(const EvidenceItem &item, QString *error) co
         if (error) *error = QStringLiteral("Cannot create evidence directory: %1").arg(dir);
         return false;
     }
-    QFile f(QDir(dir).filePath(QStringLiteral("metadata.json")));
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        if (error) *error = QStringLiteral("Cannot write evidence metadata: %1").arg(f.errorString());
-        return false;
-    }
-    f.write(QJsonDocument(item.toJson()).toJson(QJsonDocument::Indented));
-    return true;
+    return writeFileAtomic(QDir(dir).filePath(QStringLiteral("metadata.json")),
+                           QJsonDocument(item.toJson()).toJson(QJsonDocument::Indented), error);
 }
 
-IntakeResult CaseWorkspace::addEvidence(const QString &sourcePath)
+IntakeResult CaseWorkspace::addEvidence(const QString &sourcePath, EvidenceStorageMode mode)
 {
     EvidenceIntake intake(m_analyzers);
     IntakeResult result = intake.import(m_info.id, sourcePath);
     if (!result.ok)
         return result;
+
+    result.item.storageMode = mode;
+    if (mode == EvidenceStorageMode::WorkingCopy) {
+        // Import an immutable copy into the case and verify it matches the
+        // source before we rely on it. The original is never modified.
+        const QString relDir = QStringLiteral("evidence/%1")
+                                   .arg(result.item.id.toString(QUuid::WithoutBraces));
+        const QString absDir = QDir(m_rootPath).filePath(relDir);
+        if (!QDir().mkpath(absDir)) {
+            result.ok = false;
+            result.error = QStringLiteral("Cannot create working-copy directory: %1").arg(absDir);
+            return result;
+        }
+        const QString rel = relDir + QStringLiteral("/source.bin");
+        const QString abs = QDir(m_rootPath).filePath(rel);
+        QFile::remove(abs);
+        if (!QFile::copy(result.item.originalPath, abs)) {
+            result.ok = false;
+            result.error = QStringLiteral("Could not import working copy of %1").arg(result.item.originalPath);
+            return result;
+        }
+        const QString copySha = HashingService::sha256File(abs);
+        if (copySha != result.item.sha256) {
+            result.ok = false;
+            result.error = QStringLiteral("Working copy hash mismatch (copy corrupted during import).");
+            return result;
+        }
+        result.item.workingCopyPath = rel;
+    }
 
     QString err;
     if (!persistEvidence(result.item, &err)) {
@@ -205,10 +239,12 @@ IntakeResult CaseWorkspace::addEvidence(const QString &sourcePath)
     details[QStringLiteral("size")] = static_cast<double>(result.item.size);
     details[QStringLiteral("sha256")] = result.item.sha256;
     details[QStringLiteral("artifactType")] = result.item.type.id;
-    if (m_audit) {
-        m_audit->append(m_info.examiner.isEmpty() ? QStringLiteral("system") : m_info.examiner,
-                        QStringLiteral("evidence_added"), QStringLiteral("evidence"),
-                        result.item.id.toString(QUuid::WithoutBraces), details);
+    QString aerr;
+    if (!appendAudit(QStringLiteral("evidence_added"), QStringLiteral("evidence"),
+                     result.item.id.toString(QUuid::WithoutBraces), details, &aerr)) {
+        result.ok = false;
+        result.error = aerr;
+        return result;
     }
 
     return result;
@@ -262,13 +298,8 @@ bool CaseWorkspace::persistExtraction(const Extraction &e, QString *error) const
         if (error) *error = QStringLiteral("Cannot create extraction directory: %1").arg(dir);
         return false;
     }
-    QFile f(QDir(dir).filePath(QStringLiteral("extraction.json")));
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        if (error) *error = QStringLiteral("Cannot write extraction metadata: %1").arg(f.errorString());
-        return false;
-    }
-    f.write(QJsonDocument(e.toJson()).toJson(QJsonDocument::Indented));
-    return true;
+    return writeFileAtomic(QDir(dir).filePath(QStringLiteral("extraction.json")),
+                           QJsonDocument(e.toJson()).toJson(QJsonDocument::Indented), error);
 }
 
 CaseWorkspace::ExtractionOutcome CaseWorkspace::extractHash(const QUuid &evidenceId,
@@ -289,13 +320,24 @@ CaseWorkspace::ExtractionOutcome CaseWorkspace::extractHash(const QUuid &evidenc
         return outcome;
     }
 
+    // Evidence integrity gate: the artifact must still match its intake hash
+    // before we read it again. On mismatch we fail loudly rather than extract
+    // from altered data.
+    const IntegrityResult integrity = verifyEvidenceIntegrity(evidenceId);
+    if (!integrity.ok) {
+        outcome.error = integrity.error;
+        return outcome;
+    }
+
     Extraction rec;
     rec.id = QUuid::createUuid();
     rec.caseId = m_info.id;
     rec.evidenceId = evidenceId;
     rec.startedUtc = QDateTime::currentDateTimeUtc();
 
-    const ExtractionResult result = extractor->extract(*item, ctx);
+    EvidenceItem forExtraction = *item;
+    forExtraction.originalPath = evidenceReadPath(*item);
+    const ExtractionResult result = extractor->extract(forExtraction, ctx);
 
     rec.endedUtc = QDateTime::currentDateTimeUtc();
     rec.extractorId = result.extractorId;
@@ -339,10 +381,11 @@ CaseWorkspace::ExtractionOutcome CaseWorkspace::extractHash(const QUuid &evidenc
     details[QStringLiteral("exitCode")] = rec.exitCode;
     details[QStringLiteral("selectedMode")] = static_cast<double>(rec.selectedMode);
     details[QStringLiteral("candidateModeCount")] = rec.candidateModes.size();
-    if (m_audit) {
-        m_audit->append(m_info.examiner.isEmpty() ? QStringLiteral("system") : m_info.examiner,
-                        QStringLiteral("hash_extracted"), QStringLiteral("extraction"),
-                        rec.id.toString(QUuid::WithoutBraces), details);
+    QString aerr;
+    if (!appendAudit(QStringLiteral("hash_extracted"), QStringLiteral("extraction"),
+                     rec.id.toString(QUuid::WithoutBraces), details, &aerr)) {
+        outcome.error = aerr;
+        return outcome;
     }
 
     outcome.ok = true;
@@ -370,14 +413,12 @@ bool CaseWorkspace::selectExtractionMode(const QUuid &extractionId, quint32 mode
             if (error) *error = perr;
             return false;
         }
-        if (m_audit) {
-            QJsonObject details;
-            details[QStringLiteral("extractionId")] = extractionId.toString(QUuid::WithoutBraces);
-            details[QStringLiteral("selectedMode")] = static_cast<double>(mode);
-            m_audit->append(m_info.examiner.isEmpty() ? QStringLiteral("system") : m_info.examiner,
-                            QStringLiteral("extraction_mode_selected"), QStringLiteral("extraction"),
-                            extractionId.toString(QUuid::WithoutBraces), details);
-        }
+        QJsonObject details;
+        details[QStringLiteral("extractionId")] = extractionId.toString(QUuid::WithoutBraces);
+        details[QStringLiteral("selectedMode")] = static_cast<double>(mode);
+        if (!appendAudit(QStringLiteral("extraction_mode_selected"), QStringLiteral("extraction"),
+                         extractionId.toString(QUuid::WithoutBraces), details, error))
+            return false;
         return true;
     }
     if (error) *error = QStringLiteral("No such extraction.");
@@ -398,12 +439,9 @@ bool CaseWorkspace::saveJob(const CrackingJob &job, QString *error)
         if (error) *error = QStringLiteral("Cannot create job directory: %1").arg(dir);
         return false;
     }
-    QFile f(QDir(dir).filePath(QStringLiteral("job.json")));
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        if (error) *error = QStringLiteral("Cannot write job.json: %1").arg(f.errorString());
+    if (!writeFileAtomic(QDir(dir).filePath(QStringLiteral("job.json")),
+                         QJsonDocument(job.toJson()).toJson(QJsonDocument::Indented), error))
         return false;
-    }
-    f.write(QJsonDocument(job.toJson()).toJson(QJsonDocument::Indented));
 
     const int i = [&] {
         for (int k = 0; k < m_jobs.size(); ++k)
@@ -423,9 +461,9 @@ bool CaseWorkspace::saveJob(const CrackingJob &job, QString *error)
         details[QStringLiteral("hashMode")] = static_cast<double>(job.hashMode);
         details[QStringLiteral("attackMode")] = job.attackMode;
         details[QStringLiteral("hashcatArgs")] = job.hashcatArgs.join(QLatin1Char(' '));
-        m_audit->append(m_info.examiner.isEmpty() ? QStringLiteral("system") : m_info.examiner,
-                        QStringLiteral("job_created"), QStringLiteral("job"),
-                        job.id.toString(QUuid::WithoutBraces), details);
+        if (!appendAudit(QStringLiteral("job_created"), QStringLiteral("job"),
+                         job.id.toString(QUuid::WithoutBraces), details, error))
+            return false;
     }
     return true;
 }
@@ -463,15 +501,12 @@ bool CaseWorkspace::addRecoveredCredential(const RecoveredCredential &cred, QStr
     // Persist the full set as results/recovered.json.
     const QString dir = QDir(m_rootPath).filePath(QStringLiteral("results"));
     QDir().mkpath(dir);
-    QFile f(QDir(dir).filePath(QStringLiteral("recovered.json")));
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        if (error) *error = QStringLiteral("Cannot write recovered.json: %1").arg(f.errorString());
-        return false;
-    }
     QJsonArray arr;
     for (const RecoveredCredential &rc : m_credentials)
         arr.append(rc.toJson());
-    f.write(QJsonDocument(arr).toJson(QJsonDocument::Indented));
+    if (!writeFileAtomic(QDir(dir).filePath(QStringLiteral("recovered.json")),
+                         QJsonDocument(arr).toJson(QJsonDocument::Indented), error))
+        return false;
 
     if (m_audit) {
         // Record recovery metadata (not the plaintext) in the audit trail.
@@ -479,9 +514,9 @@ bool CaseWorkspace::addRecoveredCredential(const RecoveredCredential &cred, QStr
         details[QStringLiteral("credentialId")] = c.id.toString(QUuid::WithoutBraces);
         details[QStringLiteral("jobId")] = c.jobId.toString(QUuid::WithoutBraces);
         details[QStringLiteral("evidenceId")] = c.evidenceId.toString(QUuid::WithoutBraces);
-        m_audit->append(m_info.examiner.isEmpty() ? QStringLiteral("system") : m_info.examiner,
-                        QStringLiteral("credential_recovered"), QStringLiteral("credential"),
-                        c.id.toString(QUuid::WithoutBraces), details);
+        if (!appendAudit(QStringLiteral("credential_recovered"), QStringLiteral("credential"),
+                         c.id.toString(QUuid::WithoutBraces), details, error))
+            return false;
     }
     return true;
 }
@@ -505,6 +540,57 @@ bool CaseWorkspace::loadCredentials(QString *error)
     for (const QJsonValue &v : doc.array())
         m_credentials.append(RecoveredCredential::fromJson(v.toObject()));
     return true;
+}
+
+
+QString CaseWorkspace::evidenceReadPath(const EvidenceItem &item) const
+{
+    if (item.storageMode == EvidenceStorageMode::WorkingCopy && !item.workingCopyPath.isEmpty())
+        return QDir(m_rootPath).filePath(item.workingCopyPath);
+    return item.originalPath;
+}
+
+CaseWorkspace::IntegrityResult CaseWorkspace::verifyEvidenceIntegrity(const QUuid &evidenceId)
+{
+    IntegrityResult r;
+    EvidenceItem *item = evidenceById(evidenceId);
+    if (!item) {
+        r.error = QStringLiteral("No such evidence item in this case.");
+        return r;
+    }
+    r.recordedSha256 = item->sha256;
+
+    const QString path = evidenceReadPath(*item);
+    QString hashErr;
+    const QString current = HashingService::sha256File(path, &hashErr);
+    if (current.isEmpty()) {
+        r.checked = false;
+        r.error = QStringLiteral("Cannot read artifact to verify integrity: %1").arg(hashErr);
+        QJsonObject d;
+        d[QStringLiteral("evidenceId")] = evidenceId.toString(QUuid::WithoutBraces);
+        d[QStringLiteral("path")] = path;
+        d[QStringLiteral("reason")] = QStringLiteral("unreadable");
+        appendAudit(QStringLiteral("integrity_check_failed"), QStringLiteral("evidence"),
+                    evidenceId.toString(QUuid::WithoutBraces), d);
+        return r;
+    }
+
+    r.checked = true;
+    r.currentSha256 = current;
+    r.ok = (current == item->sha256);
+    if (!r.ok) {
+        r.error = QStringLiteral(
+            "Evidence integrity check FAILED for %1.\nRecorded SHA-256: %2\nCurrent SHA-256:  %3\n"
+            "The artifact has changed since intake; refusing to proceed.")
+                      .arg(item->filename, item->sha256, current);
+        QJsonObject d;
+        d[QStringLiteral("evidenceId")] = evidenceId.toString(QUuid::WithoutBraces);
+        d[QStringLiteral("recordedSha256")] = item->sha256;
+        d[QStringLiteral("currentSha256")] = current;
+        appendAudit(QStringLiteral("integrity_mismatch"), QStringLiteral("evidence"),
+                    evidenceId.toString(QUuid::WithoutBraces), d);
+    }
+    return r;
 }
 
 } // namespace forensic

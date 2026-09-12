@@ -71,6 +71,10 @@ add_library(forensic_core STATIC
     src/forensic/execution/hashcatstatus.h
     src/forensic/execution/hashcatstatusparser.h
     src/forensic/execution/hashcatstatusparser.cpp
+    src/forensic/execution/hashcatstatusstream.h
+    src/forensic/execution/hashcatstatusstream.cpp
+    src/forensic/execution/crackedplain.h
+    src/forensic/execution/crackedplain.cpp
     src/forensic/execution/jobexecutionbackend.h
     src/forensic/execution/jobqueue.h
     src/forensic/execution/jobqueue.cpp
@@ -85,6 +89,7 @@ add_library(forensic_core STATIC
     src/forensic/hashingservice.h
     src/forensic/hashingservice.cpp
     src/forensic/jsonutil.h
+    src/forensic/atomicwrite.h
     src/forensic/evidenceitem.h
     src/forensic/evidenceitem.cpp
     src/forensic/evidenceintake.h
