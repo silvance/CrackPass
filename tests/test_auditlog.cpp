@@ -20,7 +20,9 @@ private slots:
     void reloadPreservesChain();
     void tamperingIsDetected();
     void deletionIsDetected();
-    void tailTruncationNotYetDetectedByChainAlone();
+    void tailTruncationIsDetectedViaAnchor();
+    void wholeLogDeletionIsDetectedViaAnchor();
+    void anchorStaysInSyncAcrossReload();
     void appendFailureDoesNotAdvanceChain();
 };
 
@@ -110,13 +112,10 @@ void TestAuditLog::deletionIsDetected()
 }
 
 
-void TestAuditLog::tailTruncationNotYetDetectedByChainAlone()
+void TestAuditLog::tailTruncationIsDetectedViaAnchor()
 {
-    // Characterizes a KNOWN LIMITATION: dropping entries from the END of the log
-    // leaves a shorter but internally consistent chain, so chain verification
-    // alone cannot detect it. This documents the gap that the planned external
-    // head-hash + event-count anchor will close; when that anchor lands this
-    // expectation must flip to load() FAILING.
+    // Dropping entries from the END leaves a chain that is internally consistent
+    // but shorter than the anchor records, so load() must reject it.
     QTemporaryDir dir;
     const QString path = dir.filePath("audit.jsonl");
     {
@@ -125,7 +124,8 @@ void TestAuditLog::tailTruncationNotYetDetectedByChainAlone()
         log.append("examiner", "e2", "x", "id2", {});
         log.append("examiner", "e3", "x", "id3", {});
     }
-    // Keep only the first two events (drop the trailing one).
+    // Keep only the first two events (drop the trailing one). The anchor still
+    // records three events with the third's head hash.
     QFile f(path);
     QVERIFY(f.open(QIODevice::ReadOnly));
     const QList<QByteArray> lines = f.readAll().split('\n');
@@ -136,8 +136,52 @@ void TestAuditLog::tailTruncationNotYetDetectedByChainAlone()
     f.close();
 
     AuditLog reloaded(path);
-    QVERIFY(reloaded.load());            // NOT detected by chain alone (known gap)
+    QString err;
+    QVERIFY(!reloaded.load(&err));       // now detected via the anchor
+    QVERIFY(!err.isEmpty());
+}
+
+void TestAuditLog::wholeLogDeletionIsDetectedViaAnchor()
+{
+    // Deleting the entire log while the anchor survives must be detected: the
+    // anchor expects events that no longer exist.
+    QTemporaryDir dir;
+    const QString path = dir.filePath("audit.jsonl");
+    {
+        AuditLog log(path);
+        log.append("examiner", "case_created", "case", "c1", {});
+        log.append("examiner", "e2", "x", "id2", {});
+    }
+    QVERIFY(QFile::remove(path));        // anchor (path + ".anchor") remains
+
+    AuditLog reloaded(path);
+    QVERIFY(!reloaded.load());
+}
+
+void TestAuditLog::anchorStaysInSyncAcrossReload()
+{
+    // A legitimate log always matches its anchor across reloads.
+    QTemporaryDir dir;
+    const QString path = dir.filePath("audit.jsonl");
+    QString head;
+    {
+        AuditLog log(path);
+        log.append("examiner", "case_created", "case", "c1", {});
+        log.append("examiner", "e2", "x", "id2", {});
+        head = log.headHash();
+    }
+    QVERIFY(QFile::exists(path + ".anchor"));
+    AuditLog reloaded(path);
+    QVERIFY(reloaded.load());
     QCOMPARE(reloaded.events().size(), 2);
+    QCOMPARE(reloaded.headHash(), head);
+
+    // A further append keeps the anchor in step for the next reload.
+    QVERIFY(reloaded.append("examiner", "e3", "x", "id3", {}));
+    AuditLog again(path);
+    QVERIFY(again.load());
+    QCOMPARE(again.events().size(), 3);
+    QCOMPARE(again.headHash(), reloaded.headHash());
 }
 
 void TestAuditLog::appendFailureDoesNotAdvanceChain()

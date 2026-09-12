@@ -37,6 +37,15 @@ struct AuditEvent
 /*
  * Append-only audit log persisted as JSON-lines. Not a QObject so it is fully
  * usable and testable outside the UI.
+ *
+ * The chain hash makes in-place tampering and mid-log deletion detectable, but
+ * a chain that has simply had entries dropped from the END stays internally
+ * consistent. To detect that, the log keeps a small sidecar "anchor" file next
+ * to it recording the expected head hash and event count; load() compares the
+ * log against the anchor and fails on any mismatch (tail truncation or whole-log
+ * deletion). The anchor defends against accidental truncation and naive
+ * tampering -- an adversary who rewrites BOTH files consistently can still
+ * shorten history undetectably, which requires an off-box anchor (out of scope).
  */
 class AuditLog
 {
@@ -65,7 +74,13 @@ public:
     // Exposed so tests and verify() agree on the hashing scheme.
     static QString computeHash(const QString &prevHash, const AuditEvent &event);
 
+    // Sidecar file recording the expected head hash + event count.
+    QString anchorPath() const { return m_filePath + QStringLiteral(".anchor"); }
+
 private:
+    // Persists the current head hash + event count to the anchor sidecar.
+    bool writeAnchor(QString *error) const;
+
     QString m_filePath;
     QList<AuditEvent> m_events;
     QString m_headHash;

@@ -158,16 +158,12 @@ void TestCaseWorkspace::mutationRefusesAndLeavesNoStateWhenAuditFails()
     QVERIFY(!r.error.isEmpty());
     QCOMPARE(ws->evidence().size(), before);     // no phantom in-memory state
 
-    // And the metadata write was rolled back: reopening (after restoring a
-    // valid audit log) shows no evidence persisted.
-    QDir(auditPath).removeRecursively();
-    { QFile f(auditPath); f.open(QIODevice::WriteOnly); f.close(); } // empty valid log
-    const QString root = ws->rootPath();
-    ws.reset();
-    QString err;
-    auto reopened = CaseWorkspace::open(root, &err);
-    QVERIFY2(reopened != nullptr, qPrintable(err));
-    QCOMPARE(reopened->evidence().size(), 0);
+    // And the metadata write was rolled back on disk: the evidence item's
+    // metadata.json must not survive a refused mutation.
+    const QString metaPath = QDir(QDir(ws->evidenceDir())
+                                      .filePath(r.item.id.toString(QUuid::WithoutBraces)))
+                                 .filePath(QStringLiteral("metadata.json"));
+    QVERIFY(!QFile::exists(metaPath));
 }
 
 QTEST_GUILESS_MAIN(TestCaseWorkspace)
