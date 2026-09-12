@@ -58,6 +58,7 @@ private slots:
     void restoreRegistersJobWithoutStarting();
     void restoreNormalizesInterruptedRunningToPaused();
     void restoredPausedJobResumesWithRestoreFlag();
+    void routesJobToItsEngineBackend();
 };
 
 void TestJobQueue::statusMovesToRunning()
@@ -177,6 +178,27 @@ void TestJobQueue::restoredPausedJobResumesWithRestoreFlag()
     QCOMPARE(backend.resumed, (QList<QUuid>{j.id}));
     QVERIFY(backend.resumeRestoreFlag);
     QCOMPARE(q.jobById(j.id).state, JobState::Preparing);
+}
+
+void TestJobQueue::routesJobToItsEngineBackend()
+{
+    FakeBackend hashcat; // default
+    FakeBackend john;
+    JobQueue q(&hashcat);
+    q.registerBackend(QStringLiteral("john"), &john);
+
+    CrackingJob j = job();
+    j.engineId = QStringLiteral("john");
+    const QUuid id = q.enqueue(j, {});
+
+    // The job was dispatched to the engine's backend, not the default.
+    QCOMPARE(john.started, (QList<QUuid>{id}));
+    QVERIFY(hashcat.started.isEmpty());
+
+    // Control/lifecycle also routes to the same backend.
+    q.stop(id);
+    QCOMPARE(john.stoppedCalls, (QList<QUuid>{id}));
+    QVERIFY(hashcat.stoppedCalls.isEmpty());
 }
 
 QTEST_GUILESS_MAIN(TestJobQueue)

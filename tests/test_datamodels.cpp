@@ -32,6 +32,7 @@ void TestDataModels::crackingJobRoundTrip()
     j.evidenceId = QUuid::createUuid();
     j.hashMode = 13400;
     j.attackMode = 0;
+    j.engineId = "hashcat";
     j.hashcatArgs = {"-m", "13400", "-a", "0", "hash.txt", "words.txt"};
     j.hashcatPath = "/usr/bin/hashcat";
     j.hashcatVersion = "v7.1.2";
@@ -47,6 +48,7 @@ void TestDataModels::crackingJobRoundTrip()
     QCOMPARE(back.hashMode, j.hashMode);
     QCOMPARE(back.hashcatArgs, j.hashcatArgs);
     QCOMPARE(back.hashcatVersion, j.hashcatVersion);
+    QCOMPARE(back.engineId, j.engineId);
     QCOMPARE(back.devices.size(), 1);
     QCOMPARE(back.devices.first().name, QStringLiteral("NVIDIA RTX 4090"));
     QCOMPARE(back.state, JobState::Recovered);

@@ -77,6 +77,7 @@ QJsonObject CrackingJob::toJson() const
     obj[QStringLiteral("evidenceId")] = evidenceId.toString(QUuid::WithoutBraces);
     obj[QStringLiteral("hashMode")] = static_cast<double>(hashMode);
     obj[QStringLiteral("attackMode")] = attackMode;
+    obj[QStringLiteral("engineId")] = engineId;
     obj[QStringLiteral("hashcatArgs")] = argsArray;
     obj[QStringLiteral("hashcatPath")] = hashcatPath;
     obj[QStringLiteral("hashFile")] = hashFile;
@@ -100,6 +101,10 @@ CrackingJob CrackingJob::fromJson(const QJsonObject &obj)
     j.evidenceId = QUuid::fromString(obj.value(QStringLiteral("evidenceId")).toString());
     j.hashMode = static_cast<quint32>(obj.value(QStringLiteral("hashMode")).toDouble());
     j.attackMode = obj.value(QStringLiteral("attackMode")).toInt();
+    // Records written before engines were pluggable are hashcat jobs.
+    j.engineId = obj.value(QStringLiteral("engineId")).toString();
+    if (j.engineId.isEmpty())
+        j.engineId = QStringLiteral("hashcat");
     for (const QJsonValue &v : obj.value(QStringLiteral("hashcatArgs")).toArray())
         j.hashcatArgs.append(v.toString());
     j.hashcatPath = obj.value(QStringLiteral("hashcatPath")).toString();

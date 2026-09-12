@@ -5,7 +5,6 @@
 #include "recoverycontroller.h"
 
 #include "forensic/caseworkspace.h"
-#include "forensic/planner/attackcommandbuilder.h"
 
 #include <QDir>
 
@@ -28,9 +27,9 @@ RecoveryController::RecoveryController(JobQueue *queue, QObject *parent)
     });
 }
 
-CrackingJob RecoveryController::buildJob(const AttackJobSpec &spec, const QString &caseId,
-                                         const QUuid &evidenceId, const QString &hashcatPath,
-                                         const QString &hashcatVersion)
+CrackingJob RecoveryController::buildJob(const RecoveryEngine &engine, const AttackJobSpec &spec,
+                                         const QString &caseId, const QUuid &evidenceId,
+                                         const QString &toolPath, const QString &toolVersion)
 {
     CrackingJob job;
     job.id = QUuid::createUuid();
@@ -38,9 +37,10 @@ CrackingJob RecoveryController::buildJob(const AttackJobSpec &spec, const QStrin
     job.evidenceId = evidenceId;
     job.hashMode = spec.hashMode;
     job.attackMode = spec.attackMode;
-    job.hashcatPath = hashcatPath;
-    job.hashcatVersion = hashcatVersion;
-    job.hashcatArgs = AttackCommandBuilder::buildArgs(spec);
+    job.engineId = engine.id();
+    job.hashcatPath = toolPath;
+    job.hashcatVersion = toolVersion;
+    job.hashcatArgs = engine.buildArgs(spec);
     job.hashFile = spec.hashFile;
     job.wordlists = spec.wordlists;
     job.rules = spec.rules;
@@ -60,13 +60,17 @@ JobQueue::JobPaths RecoveryController::buildPaths(const QString &jobDir, const Q
 }
 
 QUuid RecoveryController::queueRecoveryJob(const AttackJobSpec &spec, const QUuid &evidenceId,
-                                           const QString &hashcatPath, const QString &hashcatVersion)
+                                           const QString &toolPath, const QString &toolVersion,
+                                           const QString &engineId)
 {
     if (!m_workspace)
         return QUuid();
+    const RecoveryEngine *engine = m_engines.find(engineId);
+    if (!engine)
+        return QUuid(); // unknown engine: refuse rather than run the wrong tool
 
-    const CrackingJob job = buildJob(spec, m_workspace->info().id, evidenceId,
-                                     hashcatPath, hashcatVersion);
+    const CrackingJob job = buildJob(*engine, spec, m_workspace->info().id, evidenceId,
+                                     toolPath, toolVersion);
     const QString jobDir = m_workspace->jobDir(job.id);
     QDir().mkpath(jobDir);
     return m_queue->enqueue(job, buildPaths(jobDir, job.id));

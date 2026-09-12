@@ -39,7 +39,13 @@ public:
         QString restorePath;
     };
 
+    // `backend` is the default engine's backend (used for jobs whose engineId is
+    // unregistered or empty, e.g. legacy hashcat jobs).
     explicit JobQueue(JobExecutionBackend *backend, QObject *parent = nullptr);
+
+    // Register an additional engine's backend. A job is dispatched to the
+    // backend registered under its engineId, falling back to the default.
+    void registerBackend(const QString &engineId, JobExecutionBackend *backend);
 
     // Enqueue a job (state Pending) with the paths the backend should use.
     QUuid enqueue(const CrackingJob &job, const JobPaths &paths);
@@ -78,10 +84,13 @@ private:
     int indexOf(const QUuid &id) const;
     void setState(const QUuid &id, JobState state);
     JobExecutionBackend::StartOptions optionsFor(const QUuid &id, bool restore) const;
+    void connectBackend(JobExecutionBackend *backend);
+    JobExecutionBackend *backendFor(const QUuid &id) const;
     void tryStartNext();
     void releaseAndAdvance(const QUuid &finishedId);
 
-    JobExecutionBackend *m_backend;
+    JobExecutionBackend *m_backend; // default engine backend
+    QHash<QString, JobExecutionBackend *> m_backends; // engineId -> backend
     QList<CrackingJob> m_jobs;
     QHash<QUuid, JobPaths> m_paths;
     QHash<QUuid, HashcatStatus> m_status;

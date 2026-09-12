@@ -54,7 +54,13 @@ struct CrackingJob
     quint32 hashMode = 0;
     int attackMode = 0;
 
-    QStringList hashcatArgs;   // exact argv passed to hashcat
+    // Which recovery engine ran (or will run) this job, e.g. "hashcat" or
+    // "john". Recorded for provenance and used to route the job to its backend.
+    // The hashcat* fields below hold the chosen engine's path/version/argv (the
+    // names are historical; for a non-hashcat engine they are that engine's).
+    QString engineId;
+
+    QStringList hashcatArgs;   // exact argv passed to the engine
     QString hashcatPath;
     QString hashFile;          // extracted-hash file being attacked
     QStringList wordlists;     // wordlists used (for reporting)

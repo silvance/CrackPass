@@ -18,6 +18,8 @@
 #include "forensic/crackingjob.h"
 #include "forensic/execution/jobqueue.h"
 #include "forensic/planner/attackjobspec.h"
+#include "recoveryengine.h"
+#include "recoveryengineregistry.h"
 
 #include <QObject>
 #include <QString>
@@ -38,27 +40,34 @@ public:
     void setWorkspace(CaseWorkspace *workspace) { m_workspace = workspace; }
     CaseWorkspace *workspace() const { return m_workspace; }
 
+    // Replace the set of known engines (defaults to the built-ins).
+    void setEngines(RecoveryEngineRegistry engines) { m_engines = std::move(engines); }
+    const RecoveryEngineRegistry &engines() const { return m_engines; }
+
     // Build the reproducible job from a planned spec, enqueue it, and return its
-    // id (null if no workspace is set). The initial record is persisted and, as
-    // the queue runs it, state transitions and any recovered credential are
-    // written to the case automatically.
+    // id (null if no workspace is set, or the engineId is unknown). `engineId`
+    // selects the recovery engine (default hashcat); `toolPath`/`toolVersion`
+    // record the resolved binary for provenance. As the queue runs the job,
+    // state transitions and any recovered credential are written to the case.
     QUuid queueRecoveryJob(const AttackJobSpec &spec, const QUuid &evidenceId,
-                           const QString &hashcatPath, const QString &hashcatVersion = QString());
+                           const QString &toolPath, const QString &toolVersion = QString(),
+                           const QString &engineId = RecoveryEngineRegistry::defaultEngineId());
 
     // Re-register the current case's persisted jobs into the queue (with their
     // session paths reconstructed) so they survive a reopen: resume/stop/report
     // can target them and a resumable job can be continued. Never auto-starts.
     void restoreJobs();
 
-    // Exposed for reuse/testing.
-    static CrackingJob buildJob(const AttackJobSpec &spec, const QString &caseId,
-                                const QUuid &evidenceId, const QString &hashcatPath,
-                                const QString &hashcatVersion);
+    // Exposed for reuse/testing. The engine supplies the job's engineId and argv.
+    static CrackingJob buildJob(const RecoveryEngine &engine, const AttackJobSpec &spec,
+                                const QString &caseId, const QUuid &evidenceId,
+                                const QString &toolPath, const QString &toolVersion);
     static JobQueue::JobPaths buildPaths(const QString &jobDir, const QUuid &jobId);
 
 private:
     JobQueue *m_queue;
     CaseWorkspace *m_workspace = nullptr;
+    RecoveryEngineRegistry m_engines = RecoveryEngineRegistry::withBuiltins();
 };
 
 } // namespace forensic
