@@ -33,6 +33,7 @@ private slots:
     void addEvidenceDoesNotModifySource();
     void reopenPersistsEvidenceAndAudit();
     void auditChainRecordsActions();
+    void probeEncryptionUsesWorkingCopyWhenOriginalGone();
 };
 
 void TestCaseWorkspace::createScaffoldsDirsAndManifest()
@@ -112,6 +113,28 @@ void TestCaseWorkspace::auditChainRecordsActions()
     QCOMPARE(events.at(0).action, QStringLiteral("case_created"));
     QCOMPARE(events.at(1).action, QStringLiteral("evidence_added"));
     QVERIFY(ws->audit().verify());
+}
+
+void TestCaseWorkspace::probeEncryptionUsesWorkingCopyWhenOriginalGone()
+{
+    // With a working-copy import the case must analyze its own immutable copy,
+    // not the original path. Deleting the source proves the probe reads the
+    // working copy rather than depending on originalPath.
+    QTemporaryDir dir, src;
+    auto ws = CaseWorkspace::create(dir.path(), CaseInfo{});
+    QVERIFY(ws);
+
+    const QString pdf = src.filePath("enc.pdf");
+    { QFile f(pdf); f.open(QIODevice::WriteOnly);
+      f.write("%PDF-1.6\n... /Encrypt 12 0 R ... trailer"); f.close(); }
+
+    auto r = ws->addEvidence(pdf, forensic::EvidenceStorageMode::WorkingCopy);
+    QVERIFY2(r.ok, qPrintable(r.error));
+
+    // Remove the original source; only the working copy remains.
+    QVERIFY(QFile::remove(pdf));
+
+    QCOMPARE(ws->probeEncryption(r.item.id), forensic::EncryptionState::Encrypted);
 }
 
 QTEST_GUILESS_MAIN(TestCaseWorkspace)

@@ -35,6 +35,11 @@ public:
     // Exposed for testing: compose the argv passed to hashcat.
     static QStringList composeArgs(const CrackingJob &job, const StartOptions &opts);
 
+    // Exposed for testing: the binary that will be executed for `job`. Prefers
+    // the path recorded on the job (so the executed binary matches the forensic
+    // record) and falls back to `configured` only when the job records none.
+    static QString programFor(const CrackingJob &job, const QString &configured);
+
 private:
     enum class Pending { None, Pause, Stop };
     struct Context {

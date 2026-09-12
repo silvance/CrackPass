@@ -27,14 +27,22 @@ continue on unverifiable state.
 
 - The audit log is an append-only JSON-lines **hash chain** (each event hashes
   the previous head + its canonical payload).
-- `AuditLog::load()` **verifies the whole chain** and returns failure on any
-  tamper/truncation; `CaseWorkspace::open()` propagates that failure, so a case
-  with a modified audit log **never opens as if valid**.
+- `AuditLog::load()` recomputes the chain and returns failure whenever an event
+  has been **modified in place** or **removed from the middle**, because either
+  breaks the hash linkage between an event and its successor;
+  `CaseWorkspace::open()` propagates that failure, so a case with such a
+  modified audit log **never opens as if valid**.
+- **Known limitation:** removing entries from the **end** of the log
+  (whole-tail truncation) leaves a shorter but internally consistent chain, so
+  it is **not** detected by chain verification alone. Detecting it requires an
+  external anchor (the expected head hash and event count stored outside the
+  log); that anchor is planned and **not yet implemented**. Do not rely on the
+  audit log alone to prove that no trailing events were dropped.
 - `AuditLog::append()` writes and flushes the event first and only then advances
   the in-memory head. If the write fails it **reports failure and does not
   advance the chain**; `CaseWorkspace` operations surface that failure.
-- Tests: `test_auditlog` (append/verify, reload, tamper→load fails,
-  deletion→load fails, append-failure-does-not-advance).
+- Tests: `test_auditlog` (append/verify, reload, in-place tamper→load fails,
+  mid-log deletion→load fails, append-failure-does-not-advance).
 
 ## 3. Hashcat status parsing
 

@@ -264,7 +264,7 @@ EncryptionState CaseWorkspace::probeEncryption(const QUuid &evidenceId) const
 {
     for (const EvidenceItem &e : m_evidence) {
         if (e.id == evidenceId)
-            return EncryptionProbe::probe(e.type, e.originalPath);
+            return EncryptionProbe::probe(e.type, evidenceReadPath(e));
     }
     return EncryptionState::Unknown;
 }
@@ -352,19 +352,27 @@ CaseWorkspace::ExtractionOutcome CaseWorkspace::extractHash(const QUuid &evidenc
     rec.selectedMode = (result.candidateModes.size() == 1) ? result.candidateModes.first().mode : 0;
 
     // Persist artifacts (hash separate from evidence; raw logs for troubleshooting).
+    // These are part of the forensic record, so write them atomically (and detect
+    // short writes) exactly as we do for the JSON metadata: a truncated hash.txt
+    // must never be mistaken for the real extracted hash.
     const QString dir = QDir(extractionsDir()).filePath(rec.id.toString(QUuid::WithoutBraces));
-    QDir().mkpath(dir);
-    const auto writeFile = [&dir](const QString &name, const QByteArray &data) -> QString {
-        QFile f(QDir(dir).filePath(name));
-        if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
-            return QString();
-        f.write(data);
-        return name;
+    if (!QDir().mkpath(dir)) {
+        outcome.error = QStringLiteral("Cannot create extraction directory: %1").arg(dir);
+        return outcome;
+    }
+    const auto writeFile = [&dir](const QString &name, const QByteArray &data, QString *werr) -> QString {
+        return writeFileAtomic(QDir(dir).filePath(name), data, werr) ? name : QString();
     };
-    if (!result.hash.isEmpty())
-        rec.hashArtifactPath = writeFile(QStringLiteral("hash.txt"), result.hash.toUtf8());
-    rec.stdoutPath = writeFile(QStringLiteral("stdout.log"), result.stdOut.toUtf8());
-    rec.stderrPath = writeFile(QStringLiteral("stderr.log"), result.stdErr.toUtf8());
+    QString werr;
+    if (!result.hash.isEmpty()) {
+        rec.hashArtifactPath = writeFile(QStringLiteral("hash.txt"), result.hash.toUtf8(), &werr);
+        if (rec.hashArtifactPath.isEmpty()) {
+            outcome.error = QStringLiteral("Could not write extracted hash: %1").arg(werr);
+            return outcome;
+        }
+    }
+    rec.stdoutPath = writeFile(QStringLiteral("stdout.log"), result.stdOut.toUtf8(), &werr);
+    rec.stderrPath = writeFile(QStringLiteral("stderr.log"), result.stdErr.toUtf8(), &werr);
 
     QString perr;
     if (!persistExtraction(rec, &perr)) {

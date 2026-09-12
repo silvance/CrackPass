@@ -5,6 +5,7 @@
 #include "forensicwindow.h"
 
 #include "forensic/caseworkspace.h"
+#include "forensic/atomicwrite.h"
 #include "forensic/evidenceitem.h"
 #include "forensic/extraction/encryptionprobe.h"
 #include "forensic/extraction/processrunner.h"
@@ -704,11 +705,14 @@ void ForensicWindow::generateReportForSelectedJob()
     if (target.id.isNull())
         return;
 
+    // Redact by default: the examiner must deliberately opt in to embedding the
+    // recovered plaintext in an exportable report. The default action is No so
+    // that simply confirming the dialog produces a redacted report.
     const QMessageBox::StandardButton inc = QMessageBox::question(
         this, tr("Recovered password in report"),
         tr("Include the recovered plaintext password in this report?\n\n"
            "Choose No to redact it (the report still records that recovery occurred)."),
-        QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
     const bool includePlaintext = (inc == QMessageBox::Yes);
 
     const forensic::RecoveryReport rep = forensic::ReportBuilder::build(
@@ -721,26 +725,23 @@ void ForensicWindow::generateReportForSelectedJob()
     const QString htmlPath = QDir(m_workspace->reportsDir()).filePath(base + QStringLiteral(".html"));
     const QString jsonPath = QDir(m_workspace->reportsDir()).filePath(base + QStringLiteral(".json"));
 
-    bool ok = true;
-    {
-        QFile f(htmlPath);
-        ok = f.open(QIODevice::WriteOnly | QIODevice::Truncate)
-             && f.write(forensic::ReportRenderer::toHtml(rep).toUtf8()) >= 0;
-    }
-    {
-        QFile f(jsonPath);
-        ok = ok && f.open(QIODevice::WriteOnly | QIODevice::Truncate)
-             && f.write(forensic::ReportRenderer::toJson(rep)) >= 0;
-    }
-    if (!ok) {
-        QMessageBox::warning(this, tr("Generate Report"), tr("Could not write the report files."));
+    // Reports are part of the forensic record: write them atomically so a crash
+    // cannot leave a half-rendered report behind.
+    QString werr;
+    if (!forensic::writeFileAtomic(htmlPath, forensic::ReportRenderer::toHtml(rep).toUtf8(), &werr)
+        || !forensic::writeFileAtomic(jsonPath, forensic::ReportRenderer::toJson(rep), &werr)) {
+        QMessageBox::warning(this, tr("Generate Report"),
+                             tr("Could not write the report files: %1").arg(werr));
         return;
     }
-    if (m_workspace)
-        m_workspace->audit().append(
+    if (m_workspace && !m_workspace->audit().append(
             m_workspace->info().examiner.isEmpty() ? QStringLiteral("system") : m_workspace->info().examiner,
             QStringLiteral("report_generated"), QStringLiteral("job"),
-            jobId.toString(QUuid::WithoutBraces), {});
+            jobId.toString(QUuid::WithoutBraces), {})) {
+        QMessageBox::warning(this, tr("Generate Report"),
+                             tr("The report was written but the audit entry could not be recorded: %1")
+                                 .arg(m_workspace->audit().lastError()));
+    }
 
     QMessageBox box(this);
     box.setWindowTitle(tr("Report generated"));

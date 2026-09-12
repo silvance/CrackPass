@@ -14,6 +14,7 @@ class TestBackendCompose : public QObject
 private slots:
     void freshRunInjectsStatusAndSession();
     void resumeUsesRestore();
+    void executesRecordedBinaryNotConstructionTimePath();
 };
 
 void TestBackendCompose::freshRunInjectsStatusAndSession()
@@ -53,6 +54,22 @@ void TestBackendCompose::resumeUsesRestore()
     // A resume must not re-supply the original attack positionals.
     QVERIFY(!args.contains("wl.txt"));
     QVERIFY(args.contains("--status-json"));
+}
+
+void TestBackendCompose::executesRecordedBinaryNotConstructionTimePath()
+{
+    // Provenance: the executed binary must match the one recorded on the job, so
+    // that if the configured hashcat path changes between job creation and
+    // execution, the process actually run is still the one the record names.
+    CrackingJob job;
+    job.hashcatPath = "/tools/B/hashcat.exe"; // recorded at job creation
+    QCOMPARE(HashcatExecutionBackend::programFor(job, "/tools/A/hashcat.exe"),
+             QStringLiteral("/tools/B/hashcat.exe"));
+
+    // Fallback only when the job records no path (legacy/hand-built jobs).
+    CrackingJob legacy;
+    QCOMPARE(HashcatExecutionBackend::programFor(legacy, "/tools/A/hashcat.exe"),
+             QStringLiteral("/tools/A/hashcat.exe"));
 }
 
 QTEST_GUILESS_MAIN(TestBackendCompose)
