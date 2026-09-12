@@ -289,8 +289,9 @@ void ForensicWindow::openCase()
     refreshCaseHeader();
     reloadEvidenceTable();
     m_jobsTable->setRowCount(0);
-    for (const auto &job : m_workspace->jobs())
-        upsertJobRow(job);
+    // Re-register persisted jobs into the queue so resume/stop work after a
+    // reopen; each restore emits jobChanged, which populates the jobs table.
+    m_recovery->restoreJobs();
     refreshResults();
 }
 

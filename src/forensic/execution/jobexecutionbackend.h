@@ -40,7 +40,10 @@ public:
 
     virtual void start(const CrackingJob &job, const StartOptions &opts) = 0;
     virtual void pause(const QUuid &jobId) = 0;
-    virtual void resume(const QUuid &jobId) = 0;
+    // Resume takes the job + options so the backend can relaunch a job it did not
+    // start in this process (e.g. a Paused job reloaded after the app restarted);
+    // opts.restore is set by the queue.
+    virtual void resume(const CrackingJob &job, const StartOptions &opts) = 0;
     virtual void stop(const QUuid &jobId) = 0;
 
 signals:

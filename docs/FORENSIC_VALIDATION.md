@@ -101,6 +101,14 @@ supported **session/restore** mechanism and distinguishes:
   is guaranteed in this forced case.
 - **Resume** — relaunch with `--session <name> --restore`, which reloads the
   original attack; CaseKey does not re-supply the attack positionals.
+- **Resume after restart** — reopening a case rehydrates the job queue from the
+  persisted job records (`RecoveryController::restoreJobs()` → `JobQueue::restore`):
+  each job is re-registered with its session paths reconstructed, so resume/stop
+  and reporting can target it again. A job that was still in flight when the app
+  closed is normalized to `Paused` (it is no longer running) and can be resumed
+  from its restore file; the backend rebuilds the run context for a job it did
+  not start in this process. Restore never auto-starts a job — the examiner
+  resumes explicitly.
 
 > Known limitation: on Windows, delivering a graceful signal to a console
 > process may require a Ctrl-C/`GenerateConsoleCtrlEvent` path; until that is

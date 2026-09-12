@@ -190,10 +190,20 @@ void HashcatExecutionBackend::stop(const QUuid &jobId)
     requestShutdown(jobId, Pending::Stop);
 }
 
-void HashcatExecutionBackend::resume(const QUuid &jobId)
+void HashcatExecutionBackend::resume(const CrackingJob &job, const StartOptions &opts)
 {
-    if (m_contexts.contains(jobId))
-        launch(jobId, true);
+    // Reconstruct the run context if we do not have one -- this is the case when
+    // resuming a job that was persisted (Paused/interrupted) before the app was
+    // restarted, so it was never started in this process. hashcat reloads the
+    // attack from the restore file, so we only need the session/restore plumbing.
+    Context *ctx = m_contexts.value(job.id);
+    if (!ctx) {
+        ctx = new Context;
+        ctx->job = job;
+        m_contexts.insert(job.id, ctx);
+    }
+    ctx->opts = opts;
+    launch(job.id, true);
 }
 
 } // namespace forensic

@@ -44,6 +44,13 @@ public:
     // Enqueue a job (state Pending) with the paths the backend should use.
     QUuid enqueue(const CrackingJob &job, const JobPaths &paths);
 
+    // Register a job persisted in a prior session WITHOUT starting it, so it is
+    // known to the queue (resume/stop/report can target it) after a case is
+    // reopened. A job that was mid-run when the app closed (Running/Preparing/
+    // Pending) is normalized to Paused so the examiner can explicitly resume it;
+    // terminal states are kept as history. Never auto-starts.
+    void restore(const CrackingJob &job, const JobPaths &paths);
+
     void pause(const QUuid &jobId);
     void resume(const QUuid &jobId);
     void stop(const QUuid &jobId);
@@ -70,6 +77,7 @@ private slots:
 private:
     int indexOf(const QUuid &id) const;
     void setState(const QUuid &id, JobState state);
+    JobExecutionBackend::StartOptions optionsFor(const QUuid &id, bool restore) const;
     void tryStartNext();
     void releaseAndAdvance(const QUuid &finishedId);
 

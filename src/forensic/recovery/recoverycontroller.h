@@ -45,6 +45,11 @@ public:
     QUuid queueRecoveryJob(const AttackJobSpec &spec, const QUuid &evidenceId,
                            const QString &hashcatPath, const QString &hashcatVersion = QString());
 
+    // Re-register the current case's persisted jobs into the queue (with their
+    // session paths reconstructed) so they survive a reopen: resume/stop/report
+    // can target them and a resumable job can be continued. Never auto-starts.
+    void restoreJobs();
+
     // Exposed for reuse/testing.
     static CrackingJob buildJob(const AttackJobSpec &spec, const QString &caseId,
                                 const QUuid &evidenceId, const QString &hashcatPath,

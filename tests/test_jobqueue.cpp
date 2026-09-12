@@ -17,9 +17,14 @@ class FakeBackend : public JobExecutionBackend
     Q_OBJECT
 public:
     QList<QUuid> started, resumed, pausedCalls, stoppedCalls;
+    bool resumeRestoreFlag = false;
     void start(const CrackingJob &job, const StartOptions &) override { started << job.id; }
     void pause(const QUuid &id) override { pausedCalls << id; }
-    void resume(const QUuid &id) override { resumed << id; }
+    void resume(const CrackingJob &job, const StartOptions &opts) override
+    {
+        resumed << job.id;
+        resumeRestoreFlag = opts.restore;
+    }
     void stop(const QUuid &id) override { stoppedCalls << id; }
 
     void fireRunning(const QUuid &id) { emit running(id); }
@@ -50,6 +55,9 @@ private slots:
     void exhaustedThenAdvances();
     void stopRunningJob();
     void pauseFreesQueueAndResumeRestores();
+    void restoreRegistersJobWithoutStarting();
+    void restoreNormalizesInterruptedRunningToPaused();
+    void restoredPausedJobResumesWithRestoreFlag();
 };
 
 void TestJobQueue::statusMovesToRunning()
@@ -124,6 +132,51 @@ void TestJobQueue::pauseFreesQueueAndResumeRestores()
     backend.firePaused(a);
     QCOMPARE(q.jobById(a).state, JobState::Paused);
     QCOMPARE(backend.started.size(), 2);              // b starts once queue frees
+}
+
+void TestJobQueue::restoreRegistersJobWithoutStarting()
+{
+    FakeBackend backend;
+    JobQueue q(&backend);
+    CrackingJob j = job();
+    j.id = QUuid::createUuid();
+    j.state = JobState::Paused;
+    q.restore(j, {});
+    QVERIFY(q.hasJob(j.id));
+    QCOMPARE(q.jobById(j.id).state, JobState::Paused);
+    QVERIFY(backend.started.isEmpty()); // restore must never auto-start
+}
+
+void TestJobQueue::restoreNormalizesInterruptedRunningToPaused()
+{
+    FakeBackend backend;
+    JobQueue q(&backend);
+    CrackingJob j = job();
+    j.id = QUuid::createUuid();
+    j.state = JobState::Running; // was mid-run when the app closed
+    q.restore(j, {});
+    // No longer running: presented as resumable.
+    QCOMPARE(q.jobById(j.id).state, JobState::Paused);
+    QVERIFY(backend.started.isEmpty());
+}
+
+void TestJobQueue::restoredPausedJobResumesWithRestoreFlag()
+{
+    FakeBackend backend;
+    JobQueue q(&backend);
+    CrackingJob j = job();
+    j.id = QUuid::createUuid();
+    j.state = JobState::Paused;
+    JobQueue::JobPaths paths;
+    paths.sessionName = QStringLiteral("cp-restore");
+    q.restore(j, paths);
+
+    q.resume(j.id);
+    // The backend is asked to resume this job with the restore flag set, even
+    // though it never started it in this session.
+    QCOMPARE(backend.resumed, (QList<QUuid>{j.id}));
+    QVERIFY(backend.resumeRestoreFlag);
+    QCOMPARE(q.jobById(j.id).state, JobState::Preparing);
 }
 
 QTEST_GUILESS_MAIN(TestJobQueue)
