@@ -83,7 +83,8 @@ void TestRecoveryController::queuesBuildsAndPersistsJob()
     QCOMPARE(j.hashcatPath, QStringLiteral("/tools/hashcat"));
     QCOMPARE(j.hashcatVersion, QStringLiteral("v7.1"));
     QCOMPARE(j.hashMode, 13400u);
-    QVERIFY(!j.hashcatArgs.isEmpty());         // built via AttackCommandBuilder
+    QCOMPARE(j.engineId, QStringLiteral("hashcat")); // default engine recorded
+    QVERIFY(!j.hashcatArgs.isEmpty());         // built via the engine
 }
 
 void TestRecoveryController::recoveredCredentialIsPersisted()
@@ -131,7 +132,9 @@ void TestRecoveryController::restoreJobsRehydratesPersistedJobsForResume()
         auto ws = CaseWorkspace::create(dir.path(), CaseInfo{});
         QVERIFY(ws);
         root = ws->rootPath();
-        CrackingJob j = RecoveryController::buildJob(straightSpec(), ws->info().id,
+        const RecoveryEngine *hc = RecoveryEngineRegistry::withBuiltins().find("hashcat");
+        QVERIFY(hc);
+        CrackingJob j = RecoveryController::buildJob(*hc, straightSpec(), ws->info().id,
                                                      QUuid::createUuid(), QStringLiteral("/tools/hashcat"),
                                                      QStringLiteral("v7"));
         jobId = j.id;

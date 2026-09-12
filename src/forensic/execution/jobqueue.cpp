@@ -14,13 +14,38 @@ JobQueue::JobQueue(JobExecutionBackend *backend, QObject *parent)
     : QObject(parent)
     , m_backend(backend)
 {
-    connect(m_backend, &JobExecutionBackend::running, this, &JobQueue::onRunning);
-    connect(m_backend, &JobExecutionBackend::statusUpdated, this, &JobQueue::onStatus);
-    connect(m_backend, &JobExecutionBackend::cracked, this, &JobQueue::onCracked);
-    connect(m_backend, &JobExecutionBackend::paused, this, &JobQueue::onPaused);
-    connect(m_backend, &JobExecutionBackend::stopped, this, &JobQueue::onStopped);
-    connect(m_backend, &JobExecutionBackend::finished, this, &JobQueue::onFinished);
-    connect(m_backend, &JobExecutionBackend::failed, this, &JobQueue::onFailed);
+    connectBackend(m_backend);
+}
+
+void JobQueue::connectBackend(JobExecutionBackend *backend)
+{
+    if (!backend)
+        return;
+    connect(backend, &JobExecutionBackend::running, this, &JobQueue::onRunning);
+    connect(backend, &JobExecutionBackend::statusUpdated, this, &JobQueue::onStatus);
+    connect(backend, &JobExecutionBackend::cracked, this, &JobQueue::onCracked);
+    connect(backend, &JobExecutionBackend::paused, this, &JobQueue::onPaused);
+    connect(backend, &JobExecutionBackend::stopped, this, &JobQueue::onStopped);
+    connect(backend, &JobExecutionBackend::finished, this, &JobQueue::onFinished);
+    connect(backend, &JobExecutionBackend::failed, this, &JobQueue::onFailed);
+}
+
+void JobQueue::registerBackend(const QString &engineId, JobExecutionBackend *backend)
+{
+    if (engineId.isEmpty() || !backend || backend == m_backend)
+        return; // the default backend is already connected
+    const bool alreadyConnected = m_backends.values().contains(backend);
+    m_backends.insert(engineId, backend);
+    if (!alreadyConnected)
+        connectBackend(backend); // one backend may serve several engine ids
+}
+
+JobExecutionBackend *JobQueue::backendFor(const QUuid &id) const
+{
+    const int i = indexOf(id);
+    if (i < 0)
+        return m_backend;
+    return m_backends.value(m_jobs.at(i).engineId, m_backend);
 }
 
 int JobQueue::indexOf(const QUuid &id) const
@@ -101,7 +126,7 @@ void JobQueue::tryStartNext()
             m_running = id;
             m_jobs[i].startedUtc = QDateTime::currentDateTimeUtc();
             setState(id, JobState::Preparing);
-            m_backend->start(m_jobs.at(i), optionsFor(id, false));
+            backendFor(id)->start(m_jobs.at(i), optionsFor(id, false));
             return;
         }
     }
@@ -202,7 +227,7 @@ void JobQueue::onFailed(const QUuid &jobId, const QString &error)
 void JobQueue::pause(const QUuid &jobId)
 {
     if (indexOf(jobId) >= 0 && m_running == jobId)
-        m_backend->pause(jobId);
+        backendFor(jobId)->pause(jobId);
 }
 
 void JobQueue::resume(const QUuid &jobId)
@@ -214,7 +239,7 @@ void JobQueue::resume(const QUuid &jobId)
         return; // wait until the queue is free
     m_running = jobId;
     setState(jobId, JobState::Preparing);
-    m_backend->resume(m_jobs.at(i), optionsFor(jobId, true));
+    backendFor(jobId)->resume(m_jobs.at(i), optionsFor(jobId, true));
 }
 
 void JobQueue::stop(const QUuid &jobId)
@@ -223,7 +248,7 @@ void JobQueue::stop(const QUuid &jobId)
     if (i < 0)
         return;
     if (m_running == jobId) {
-        m_backend->stop(jobId);
+        backendFor(jobId)->stop(jobId);
     } else if (m_jobs.at(i).state == JobState::Pending || m_jobs.at(i).state == JobState::Paused) {
         setState(jobId, JobState::Stopped);
     }
