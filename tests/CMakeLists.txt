@@ -31,3 +31,10 @@ foreach(test_name ${FORENSIC_TESTS})
     target_compile_options(${test_name} PRIVATE -Wall -Wextra)
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
+
+# Optional real-tool integration layer (compiles always; skips at runtime when
+# external tools/corpus are absent). Disable with -DCRACKPASS_BUILD_INTEGRATION=OFF.
+option(CRACKPASS_BUILD_INTEGRATION "Build the optional real-tool integration tests" ON)
+if(CRACKPASS_BUILD_INTEGRATION)
+    add_subdirectory(integration)
+endif()
