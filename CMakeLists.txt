@@ -115,7 +115,11 @@ add_library(forensic_core STATIC
 )
 target_include_directories(forensic_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(forensic_core PUBLIC Qt6::Core)
-target_compile_options(forensic_core PRIVATE -Wall -Wextra -Wpedantic)
+# Warning flags are compiler-specific: -W* are GCC/Clang spellings that MSVC's
+# cl.exe rejects (it reads /Wextra as an invalid /W argument), so gate them.
+target_compile_options(forensic_core PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall;-Wextra;-Wpedantic>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4>)
 
 add_executable(casekey WIN32
     src/aboutdialog.h
@@ -148,7 +152,9 @@ add_executable(casekey WIN32
     src/settingsdialog.ui
 )
 
-target_compile_options(casekey PRIVATE -Wall -Wextra -Wpedantic)
+target_compile_options(casekey PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall;-Wextra;-Wpedantic>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4>)
 
 target_link_libraries(casekey PRIVATE forensic_core Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Concurrent)
 

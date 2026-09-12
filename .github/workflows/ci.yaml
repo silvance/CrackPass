@@ -8,8 +8,9 @@ jobs:
   build:
     runs-on: ${{ matrix.runs-on }}
     strategy:
+      fail-fast: false
       matrix:
-        compiler: [linux-gcc, linux-clang, windows-gcc, windows-clang]
+        compiler: [linux-gcc, linux-clang, windows-gcc, windows-clang, windows-msvc]
         include:
           - compiler: linux-gcc
             runs-on: ubuntu-latest
@@ -23,6 +24,8 @@ jobs:
           - compiler: windows-clang
             runs-on: windows-latest
             cxx: clang++
+          - compiler: windows-msvc
+            runs-on: windows-latest
 
     steps:
       - name: Checkout
@@ -45,9 +48,9 @@ jobs:
         if: runner.os == 'Linux'
         run: ctest --test-dir build --output-on-failure
 
-      # ----- Windows setup -----
-      - name: Set up MSYS2 with UCRT64 (Windows)
-        if: runner.os == 'Windows'
+      # ----- Windows / MinGW (gcc + clang via MSYS2 UCRT64) -----
+      - name: Set up MSYS2 with UCRT64 (Windows, MinGW)
+        if: matrix.compiler == 'windows-gcc' || matrix.compiler == 'windows-clang'
         uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
@@ -57,14 +60,41 @@ jobs:
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-qt6-base
 
-      - name: Build (Windows)
-        if: runner.os == 'Windows'
+      - name: Build (Windows, MinGW)
+        if: matrix.compiler == 'windows-gcc' || matrix.compiler == 'windows-clang'
         shell: msys2 {0}
         run: |
           cmake -B build -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
           cmake --build build
 
-      - name: Test (Windows)
-        if: runner.os == 'Windows'
+      - name: Test (Windows, MinGW)
+        if: matrix.compiler == 'windows-gcc' || matrix.compiler == 'windows-clang'
         shell: msys2 {0}
+        run: ctest --test-dir build --output-on-failure
+
+      # ----- Windows / MSVC (cl.exe + official Qt for MSVC) -----
+      # Proves the code builds with the toolchain a Windows forensic workstation
+      # deployment is most likely to use.
+      - name: Install Qt (MSVC)
+        if: matrix.compiler == 'windows-msvc'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.*'
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: Set up MSVC developer environment
+        if: matrix.compiler == 'windows-msvc'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build (MSVC)
+        if: matrix.compiler == 'windows-msvc'
+        shell: pwsh
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl
+          cmake --build build
+
+      - name: Test (MSVC)
+        if: matrix.compiler == 'windows-msvc'
+        shell: pwsh
         run: ctest --test-dir build --output-on-failure
