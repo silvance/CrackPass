@@ -1,0 +1,86 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-FileCopyrightText: CrackPass contributors
+ */
+#ifndef FORENSIC_JOBQUEUE_H
+#define FORENSIC_JOBQUEUE_H
+
+#include "forensic/crackingjob.h"
+#include "forensic/recoveredcredential.h"
+#include "hashcatstatus.h"
+#include "jobexecutionbackend.h"
+#include <QHash>
+#include <QList>
+#include <QObject>
+#include <QUuid>
+
+namespace forensic {
+
+/*
+ * Serial job queue and state machine. It owns the ordered list of jobs, starts
+ * them one at a time through a JobExecutionBackend, and maps backend events to
+ * the forensic job states. It never auto-starts anything that was not
+ * explicitly enqueued by the examiner.
+ *
+ * Persistence and case wiring live in the owner (which reacts to the signals);
+ * the queue itself is pure state so it is unit-testable with a fake backend.
+ */
+class JobQueue : public QObject
+{
+    Q_OBJECT
+
+public:
+    // Paths the backend needs for a job; provided by the owner (case dirs).
+    struct JobPaths {
+        QString workingDir;
+        QString sessionName;
+        QString potfilePath;
+        QString outfilePath;
+        QString restorePath;
+    };
+
+    explicit JobQueue(JobExecutionBackend *backend, QObject *parent = nullptr);
+
+    // Enqueue a job (state Pending) with the paths the backend should use.
+    QUuid enqueue(const CrackingJob &job, const JobPaths &paths);
+
+    void pause(const QUuid &jobId);
+    void resume(const QUuid &jobId);
+    void stop(const QUuid &jobId);
+
+    QList<CrackingJob> jobs() const { return m_jobs; }
+    bool hasJob(const QUuid &id) const { return indexOf(id) >= 0; }
+    CrackingJob jobById(const QUuid &id) const;
+    HashcatStatus lastStatus(const QUuid &id) const { return m_status.value(id); }
+
+signals:
+    void jobChanged(const forensic::CrackingJob &job);
+    void jobStatus(const QUuid &jobId, const forensic::HashcatStatus &status);
+    void credentialRecovered(const forensic::RecoveredCredential &cred);
+
+private slots:
+    void onRunning(const QUuid &jobId);
+    void onStatus(const QUuid &jobId, const forensic::HashcatStatus &status);
+    void onCracked(const QUuid &jobId, const QString &hash, const QString &plaintext);
+    void onPaused(const QUuid &jobId);
+    void onStopped(const QUuid &jobId);
+    void onFinished(const QUuid &jobId, int exitCode, int hashcatStatusCode);
+    void onFailed(const QUuid &jobId, const QString &error);
+
+private:
+    int indexOf(const QUuid &id) const;
+    void setState(const QUuid &id, JobState state);
+    void tryStartNext();
+    void releaseAndAdvance(const QUuid &finishedId);
+
+    JobExecutionBackend *m_backend;
+    QList<CrackingJob> m_jobs;
+    QHash<QUuid, JobPaths> m_paths;
+    QHash<QUuid, HashcatStatus> m_status;
+    QHash<QUuid, bool> m_recoveredFlag; // a credential arrived for this job
+    QUuid m_running;                    // currently executing job (null if idle)
+};
+
+} // namespace forensic
+
+#endif // FORENSIC_JOBQUEUE_H

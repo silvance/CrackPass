@@ -6,6 +6,7 @@
 #define UI_ATTACKPLANNERDIALOG_H
 
 #include "forensic/planner/attackplanner.h"
+#include "forensic/planner/attackjobspec.h"
 #include <QDialog>
 
 class QComboBox;
@@ -33,8 +34,14 @@ public:
                         const QString &hashFile, const QString &planDir,
                         QWidget *parent = nullptr);
 
+public:
+    // True if the examiner chose to queue; the spec to run.
+    bool queueRequested() const { return m_queueRequested; }
+    forensic::AttackJobSpec plannedSpec() const { return m_lastSpec; }
+
 private slots:
     void updatePreview();
+    void requestQueue();
 
 private:
     forensic::CaseKnowledge collectKnowledge() const;
@@ -64,6 +71,10 @@ private:
     QCheckBox *m_clsUpper = nullptr;
     QCheckBox *m_clsDigit = nullptr;
     QCheckBox *m_clsSpecial = nullptr;
+
+    forensic::AttackJobSpec m_lastSpec;
+    bool m_lastOk = false;
+    bool m_queueRequested = false;
 
     QPlainTextEdit *m_preview = nullptr;
     QPlainTextEdit *m_command = nullptr;

@@ -68,6 +68,14 @@ add_library(forensic_core STATIC
     src/forensic/planner/attackpreview.h
     src/forensic/planner/attackplanner.h
     src/forensic/planner/attackplanner.cpp
+    src/forensic/execution/hashcatstatus.h
+    src/forensic/execution/hashcatstatusparser.h
+    src/forensic/execution/hashcatstatusparser.cpp
+    src/forensic/execution/jobexecutionbackend.h
+    src/forensic/execution/jobqueue.h
+    src/forensic/execution/jobqueue.cpp
+    src/forensic/execution/hashcatexecutionbackend.h
+    src/forensic/execution/hashcatexecutionbackend.cpp
     src/forensic/hashingservice.h
     src/forensic/hashingservice.cpp
     src/forensic/jsonutil.h

@@ -11,6 +11,12 @@
 #include "forensic/extraction/toolresolver.h"
 #include "forensic/extraction/extraction.h"
 #include "attackplannerdialog.h"
+#include "forensic/crackingjob.h"
+#include "forensic/recoveredcredential.h"
+#include "forensic/execution/jobqueue.h"
+#include "forensic/execution/hashcatexecutionbackend.h"
+#include "forensic/execution/hashcatstatus.h"
+#include "forensic/planner/attackcommandbuilder.h"
 #include "settingsmanager.h"
 
 #include <QApplication>
@@ -23,6 +29,8 @@
 #include <QLocale>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QHBoxLayout>
+#include <QTabWidget>
 #include <QTableWidget>
 #include <QToolBar>
 #include <QVBoxLayout>
@@ -30,6 +38,10 @@
 
 using forensic::CaseWorkspace;
 using forensic::EvidenceItem;
+using forensic::CrackingJob;
+using forensic::JobQueue;
+using forensic::HashcatExecutionBackend;
+using forensic::JobState;
 
 namespace {
 
@@ -75,21 +87,47 @@ ForensicWindow::ForensicWindow(QWidget *parent)
     m_caseLabel->setWordWrap(true);
     layout->addWidget(m_caseLabel);
 
-    auto *buttons = new QWidget(central);
-    auto *buttonRow = new QVBoxLayout(buttons);
-    buttonRow->setContentsMargins(0, 0, 0, 0);
-    m_addButton = new QPushButton(tr("Add Artifact..."), buttons);
+    m_tabs = new QTabWidget(central);
+    m_tabs->addTab(buildEvidenceTab(), tr("Evidence"));
+    m_tabs->addTab(buildJobsTab(), tr("Jobs"));
+    m_tabs->addTab(buildResultsTab(), tr("Results"));
+    layout->addWidget(m_tabs);
+
+    setCentralWidget(central);
+
+    // Execution: one attached hashcat backend + a serial job queue. The queue
+    // never starts anything not explicitly enqueued by the examiner.
+    m_backend = new HashcatExecutionBackend(
+        SettingsManager::instance().getKey<QString>("hashcatPath"), this);
+    m_queue = new JobQueue(m_backend, this);
+    connect(m_queue, &JobQueue::jobChanged, this, &ForensicWindow::onJobChanged);
+    connect(m_queue, &JobQueue::jobStatus, this, &ForensicWindow::onJobStatus);
+    connect(m_queue, &JobQueue::credentialRecovered, this, &ForensicWindow::onCredentialRecovered);
+
+    setCaseActionsEnabled(false);
+}
+
+ForensicWindow::~ForensicWindow() = default;
+
+QWidget *ForensicWindow::buildEvidenceTab()
+{
+    auto *w = new QWidget(this);
+    auto *layout = new QVBoxLayout(w);
+
+    auto *buttonRow = new QHBoxLayout;
+    m_addButton = new QPushButton(tr("Add Artifact..."), w);
     connect(m_addButton, &QPushButton::clicked, this, &ForensicWindow::addArtifact);
     buttonRow->addWidget(m_addButton);
-    m_extractButton = new QPushButton(tr("Extract Hash from Selected Artifact"), buttons);
+    m_extractButton = new QPushButton(tr("Extract Hash"), w);
     connect(m_extractButton, &QPushButton::clicked, this, &ForensicWindow::extractSelected);
     buttonRow->addWidget(m_extractButton);
-    m_planButton = new QPushButton(tr("Plan Attack on Selected Artifact..."), buttons);
+    m_planButton = new QPushButton(tr("Plan Attack..."), w);
     connect(m_planButton, &QPushButton::clicked, this, &ForensicWindow::planAttackSelected);
     buttonRow->addWidget(m_planButton);
-    layout->addWidget(buttons);
+    buttonRow->addStretch();
+    layout->addLayout(buttonRow);
 
-    m_table = new QTableWidget(0, 7, central);
+    m_table = new QTableWidget(0, 7, w);
     m_table->setHorizontalHeaderLabels(
         {tr("Filename"), tr("Size"), tr("Detected type"), tr("SHA-256"),
          tr("Extractor"), tr("Extraction"), tr("Imported (UTC)")});
@@ -99,12 +137,54 @@ ForensicWindow::ForensicWindow(QWidget *parent)
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::SingleSelection);
     layout->addWidget(m_table);
-
-    setCentralWidget(central);
-    setCaseActionsEnabled(false);
+    return w;
 }
 
-ForensicWindow::~ForensicWindow() = default;
+QWidget *ForensicWindow::buildJobsTab()
+{
+    auto *w = new QWidget(this);
+    auto *layout = new QVBoxLayout(w);
+
+    auto *buttonRow = new QHBoxLayout;
+    auto *pause = new QPushButton(tr("Pause"), w);
+    auto *resume = new QPushButton(tr("Resume"), w);
+    auto *stop = new QPushButton(tr("Stop"), w);
+    connect(pause, &QPushButton::clicked, this, &ForensicWindow::pauseSelectedJob);
+    connect(resume, &QPushButton::clicked, this, &ForensicWindow::resumeSelectedJob);
+    connect(stop, &QPushButton::clicked, this, &ForensicWindow::stopSelectedJob);
+    buttonRow->addWidget(pause);
+    buttonRow->addWidget(resume);
+    buttonRow->addWidget(stop);
+    buttonRow->addStretch();
+    layout->addLayout(buttonRow);
+
+    m_jobsTable = new QTableWidget(0, 12, w);
+    m_jobsTable->setHorizontalHeaderLabels(
+        {tr("Artifact"), tr("Hash mode"), tr("Attack"), tr("Device"), tr("Progress %"),
+         tr("Speed (H/s)"), tr("Candidates"), tr("Keyspace"), tr("Runtime"), tr("ETA"),
+         tr("Status"), tr("Recovered")});
+    m_jobsTable->horizontalHeader()->setStretchLastSection(true);
+    m_jobsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_jobsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_jobsTable->setSelectionMode(QAbstractItemView::SingleSelection);
+    layout->addWidget(m_jobsTable);
+    return w;
+}
+
+QWidget *ForensicWindow::buildResultsTab()
+{
+    auto *w = new QWidget(this);
+    auto *layout = new QVBoxLayout(w);
+    layout->addWidget(new QLabel(tr("Recovered credentials in this case:"), w));
+    m_resultsTable = new QTableWidget(0, 5, w);
+    m_resultsTable->setHorizontalHeaderLabels(
+        {tr("Artifact"), tr("Plaintext"), tr("Hash"), tr("Recovered (UTC)"), tr("Job")});
+    m_resultsTable->horizontalHeader()->setStretchLastSection(true);
+    m_resultsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_resultsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    layout->addWidget(m_resultsTable);
+    return w;
+}
 
 void ForensicWindow::setCaseActionsEnabled(bool enabled)
 {
@@ -159,6 +239,10 @@ void ForensicWindow::openCase()
     setCaseActionsEnabled(true);
     refreshCaseHeader();
     reloadEvidenceTable();
+    m_jobsTable->setRowCount(0);
+    for (const auto &job : m_workspace->jobs())
+        upsertJobRow(job);
+    refreshResults();
 }
 
 void ForensicWindow::addArtifact()
@@ -304,6 +388,37 @@ void ForensicWindow::planAttackSelected()
 
     AttackPlannerDialog dlg(chosen.selectedMode, hashTypeName, hashFile, planDir, this);
     dlg.exec();
+    if (!dlg.queueRequested())
+        return; // examiner only previewed; nothing is started
+
+    const QString hashcatPath = SettingsManager::instance().getKey<QString>("hashcatPath");
+    if (hashcatPath.isEmpty()) {
+        QMessageBox::warning(this, tr("Queue Attack"),
+                             tr("Configure the hashcat path in Settings before queuing a job."));
+        return;
+    }
+
+    const forensic::AttackJobSpec spec = dlg.plannedSpec();
+    CrackingJob job;
+    job.id = QUuid::createUuid();
+    job.caseId = m_workspace->info().id;
+    job.evidenceId = item.id;
+    job.hashMode = spec.hashMode;
+    job.attackMode = spec.attackMode;
+    job.hashcatPath = hashcatPath;
+    job.hashcatArgs = forensic::AttackCommandBuilder::buildArgs(spec);
+
+    const QString jobDir = m_workspace->jobDir(job.id);
+    QDir().mkpath(jobDir);
+    JobQueue::JobPaths paths;
+    paths.workingDir = jobDir;
+    paths.sessionName = QStringLiteral("cp-") + job.id.toString(QUuid::WithoutBraces).left(8);
+    paths.potfilePath = QDir(jobDir).filePath(QStringLiteral("job.potfile"));
+    paths.outfilePath = QDir(jobDir).filePath(QStringLiteral("cracked.out"));
+    paths.restorePath = QDir(jobDir).filePath(QStringLiteral("session.restore"));
+
+    m_queue->enqueue(job, paths);
+    m_tabs->setCurrentIndex(1); // show the Jobs tab
 }
 
 void ForensicWindow::refreshCaseHeader()
@@ -375,4 +490,136 @@ void ForensicWindow::appendEvidenceRow(int row)
     set(4, extractorText);
     set(5, latestExtractionSummary(e.id.toString(QUuid::WithoutBraces)));
     set(6, e.importedUtc.toString(Qt::ISODate));
+}
+
+// ---------------------------------------------------------------------------
+// Jobs & Results
+// ---------------------------------------------------------------------------
+
+namespace {
+QString formatDuration(qint64 seconds)
+{
+    if (seconds < 0)
+        return QStringLiteral("-");
+    const qint64 h = seconds / 3600;
+    const qint64 m = (seconds % 3600) / 60;
+    const qint64 s = seconds % 60;
+    return QStringLiteral("%1:%2:%3")
+        .arg(h, 2, 10, QLatin1Char('0'))
+        .arg(m, 2, 10, QLatin1Char('0'))
+        .arg(s, 2, 10, QLatin1Char('0'));
+}
+} // namespace
+
+QString ForensicWindow::artifactName(const QUuid &evidenceId) const
+{
+    if (!m_workspace)
+        return QString();
+    for (const EvidenceItem &e : m_workspace->evidence())
+        if (e.id == evidenceId)
+            return e.filename;
+    return evidenceId.toString(QUuid::WithoutBraces);
+}
+
+int ForensicWindow::jobRow(const QUuid &jobId) const
+{
+    for (int r = 0; r < m_jobsTable->rowCount(); ++r) {
+        const QTableWidgetItem *item = m_jobsTable->item(r, 0);
+        if (item && item->data(Qt::UserRole).toUuid() == jobId)
+            return r;
+    }
+    return -1;
+}
+
+void ForensicWindow::upsertJobRow(const CrackingJob &job)
+{
+    int row = jobRow(job.id);
+    if (row < 0) {
+        row = m_jobsTable->rowCount();
+        m_jobsTable->insertRow(row);
+        for (int c = 0; c < m_jobsTable->columnCount(); ++c)
+            m_jobsTable->setItem(row, c, new QTableWidgetItem(QStringLiteral("-")));
+        m_jobsTable->item(row, 0)->setData(Qt::UserRole, QVariant::fromValue(job.id));
+    }
+    m_jobsTable->item(row, 0)->setText(artifactName(job.evidenceId));
+    m_jobsTable->item(row, 1)->setText(QStringLiteral("-m %1").arg(job.hashMode));
+    m_jobsTable->item(row, 2)->setText(forensic::attackModeName(job.attackMode));
+    m_jobsTable->item(row, 10)->setText(forensic::jobStateToString(job.state));
+}
+
+void ForensicWindow::onJobChanged(const CrackingJob &job)
+{
+    upsertJobRow(job);
+    if (m_workspace)
+        m_workspace->saveJob(job); // persist reproducible record + state
+}
+
+void ForensicWindow::onJobStatus(const QUuid &jobId, const forensic::HashcatStatus &status)
+{
+    const int row = jobRow(jobId);
+    if (row < 0)
+        return;
+    if (!status.devices.isEmpty())
+        m_jobsTable->item(row, 3)->setText(status.devices.first().name);
+    const double pct = status.progressPercent();
+    m_jobsTable->item(row, 4)->setText(pct >= 0 ? QStringLiteral("%1").arg(pct, 0, 'f', 2) : QStringLiteral("-"));
+    m_jobsTable->item(row, 5)->setText(QLocale().toString(status.aggregateSpeed));
+    m_jobsTable->item(row, 6)->setText(QLocale().toString(status.progressDone));
+    m_jobsTable->item(row, 7)->setText(QLocale().toString(status.progressTotal));
+
+    const CrackingJob job = m_queue->jobById(jobId);
+    if (job.startedUtc.isValid())
+        m_jobsTable->item(row, 8)->setText(
+            formatDuration(job.startedUtc.secsTo(QDateTime::currentDateTimeUtc())));
+    m_jobsTable->item(row, 9)->setText(
+        formatDuration(status.remainingSeconds(QDateTime::currentSecsSinceEpoch())));
+}
+
+void ForensicWindow::onCredentialRecovered(const forensic::RecoveredCredential &cred)
+{
+    if (m_workspace)
+        m_workspace->addRecoveredCredential(cred); // tied to job/artifact/case + timestamp
+    const int row = jobRow(cred.jobId);
+    if (row >= 0)
+        m_jobsTable->item(row, 11)->setText(cred.plaintext);
+    refreshResults();
+    m_tabs->setCurrentIndex(2); // surface the recovery immediately
+}
+
+void ForensicWindow::refreshResults()
+{
+    m_resultsTable->setRowCount(0);
+    if (!m_workspace)
+        return;
+    const auto creds = m_workspace->recoveredCredentials();
+    for (int i = 0; i < creds.size(); ++i) {
+        const auto &c = creds.at(i);
+        m_resultsTable->insertRow(i);
+        m_resultsTable->setItem(i, 0, new QTableWidgetItem(artifactName(c.evidenceId)));
+        m_resultsTable->setItem(i, 1, new QTableWidgetItem(c.plaintext));
+        m_resultsTable->setItem(i, 2, new QTableWidgetItem(c.hash));
+        m_resultsTable->setItem(i, 3, new QTableWidgetItem(c.recoveredUtc.toString(Qt::ISODate)));
+        m_resultsTable->setItem(i, 4, new QTableWidgetItem(c.jobId.toString(QUuid::WithoutBraces).left(8)));
+    }
+}
+
+void ForensicWindow::pauseSelectedJob()
+{
+    const int r = m_jobsTable->currentRow();
+    if (r >= 0 && m_jobsTable->item(r, 0))
+        m_queue->pause(m_jobsTable->item(r, 0)->data(Qt::UserRole).toUuid());
+}
+
+void ForensicWindow::resumeSelectedJob()
+{
+    const int r = m_jobsTable->currentRow();
+    if (r >= 0 && m_jobsTable->item(r, 0))
+        m_queue->resume(m_jobsTable->item(r, 0)->data(Qt::UserRole).toUuid());
+}
+
+void ForensicWindow::stopSelectedJob()
+{
+    const int r = m_jobsTable->currentRow();
+    if (r >= 0 && m_jobsTable->item(r, 0))
+        m_queue->stop(m_jobsTable->item(r, 0)->data(Qt::UserRole).toUuid());
 }

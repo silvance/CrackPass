@@ -14,14 +14,16 @@
 
 namespace forensic {
 
+// Lifecycle of a cracking job in the queue.
 enum class JobState {
-    Created,
-    Queued,
-    Running,
-    Paused,
-    Completed,
-    Failed,
-    Cancelled,
+    Pending,    // queued, not yet started
+    Preparing,  // process starting / building inputs
+    Running,    // hashcat actively working
+    Paused,     // paused by the examiner (resumable)
+    Exhausted,  // keyspace finished without recovering the target
+    Recovered,  // the target credential was recovered
+    Stopped,    // stopped/aborted by the examiner
+    Failed,     // error (tool missing, crash, bad args)
 };
 
 QString jobStateToString(JobState state);
@@ -59,7 +61,7 @@ struct CrackingJob
 
     QDateTime startedUtc;
     QDateTime endedUtc;
-    JobState state = JobState::Created;
+    JobState state = JobState::Pending;
     QString result;            // human-readable outcome summary
 
     qint64 runtimeMs() const;
