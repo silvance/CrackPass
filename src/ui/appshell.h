@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  */
 #ifndef UI_APPSHELL_H
 #define UI_APPSHELL_H
@@ -14,7 +14,7 @@ class ForensicWindow;
 /*
  * Launcher that lets the examiner pick a workflow:
  *   - Forensic / Guided Mode (new)
- *   - Advanced Hashcat Mode (the existing MainWindow, unchanged)
+ *   - Advanced Mode (the existing MainWindow, unchanged)
  *
  * This keeps the upstream MainWindow fully intact while adding the forensic
  * entry point.

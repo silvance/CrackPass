@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  */
 #ifndef FORENSIC_MAGICBYTEANALYZER_H
 #define FORENSIC_MAGICBYTEANALYZER_H

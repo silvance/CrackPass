@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  *
  * Test double for ProcessRunner: returns a preset result and records how it
  * was called. Never launches a process or touches the filesystem, so tests use

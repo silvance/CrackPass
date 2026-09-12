@@ -1,10 +1,10 @@
 # Third-party components and licenses
 
-CrackPass orchestrates established open-source tools. This inventory lists every
+CaseKey orchestrates established open-source tools. This inventory lists every
 third-party component the application links against or drives, and its license.
 Nothing here requires network access or a commercial license to run.
 
-> CrackPass itself is licensed **GPL-3.0-or-later** (see `LICENSE`).
+> CaseKey itself is licensed **GPL-3.0-or-later** (see `LICENSE`).
 
 ## Linked into the application
 
@@ -17,24 +17,24 @@ Nothing here requires network access or a commercial license to run.
 
 | Component | Purpose | License | Notes |
 | --- | --- | --- | --- |
-| **hashcat** | Cracking engine | MIT | Path configured by the examiner; invoked with `--status-json`. Not redistributed by CrackPass by default. |
+| **hashcat** | Cracking engine | MIT | Path configured by the examiner; invoked with `--status-json`. Not redistributed by CaseKey by default. |
 | **John the Ripper Jumbo** — `office2john`, `pdf2john`, `zip2john`, `rar2john`, `7z2john`, `keepass2john` | Hash extraction from encrypted files/containers | GPL-2.0-or-later (with OpenSSL/other permissive parts) | Supplied on the workstation; each extraction records the exact tool + version used. |
 
 ## GPU / compute runtimes (provided by the platform/driver)
 
 | Component | Purpose | License | Notes |
 | --- | --- | --- | --- |
-| **NVIDIA CUDA runtime / driver** | GPU acceleration for hashcat on NVIDIA hardware | NVIDIA proprietary EULA | Installed with the GPU driver on the workstation; not shipped by CrackPass. |
+| **NVIDIA CUDA runtime / driver** | GPU acceleration for hashcat on NVIDIA hardware | NVIDIA proprietary EULA | Installed with the GPU driver on the workstation; not shipped by CaseKey. |
 | **OpenCL ICD** | Alternate compute backend for hashcat | Vendor-specific | Provided by the GPU vendor's driver. |
 
 ## License-compatibility notes
 
-- CrackPass links Qt under the **LGPL**; the release ships Qt as separate DLLs so
+- CaseKey links Qt under the **LGPL**; the release ships Qt as separate DLLs so
   the library remains replaceable, satisfying LGPL relinking requirements.
 - hashcat and the JtR Jumbo utilities are invoked as **separate processes** over a
-  command-line boundary. They are not linked into the CrackPass binary, so their
+  command-line boundary. They are not linked into the CaseKey binary, so their
   licenses (MIT, GPL-2.0) apply to those tools independently and do not impose
-  additional obligations on CrackPass's own GPL-3.0 code beyond shipping their
+  additional obligations on CaseKey's own GPL-3.0 code beyond shipping their
   licenses if you choose to bundle the binaries.
 - If you **bundle** hashcat, JtR, rule files or wordlists into a distribution,
   include each project's own `LICENSE`/`COPYING` in `tools/<component>/` and list

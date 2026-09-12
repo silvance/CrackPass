@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  */
 #include "forensicwindow.h"
 
@@ -97,7 +97,7 @@ QString probeHashcatVersion(const QString &path)
 ForensicWindow::ForensicWindow(QWidget *parent)
     : QMainWindow(parent)
 {
-    setWindowTitle(tr("CrackPass - Forensic Mode"));
+    setWindowTitle(tr("CaseKey - Forensic Mode"));
     resize(1000, 520);
 
     auto *toolbar = addToolBar(tr("Case"));

@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  */
 #include "reportrenderer.h"
 
@@ -45,7 +45,7 @@ QString ReportRenderer::toHtml(const RecoveryReport &report)
                         "code{white-space:pre-wrap;word-break:break-all}</style></head><body>");
 
     h += QStringLiteral("<h1>Password Recovery Report</h1>");
-    h += QStringLiteral("<p>Generated %1 by CrackPass %2</p>").arg(esc(report.generatedUtc), esc(report.applicationVersion));
+    h += QStringLiteral("<p>Generated %1 by CaseKey %2</p>").arg(esc(report.generatedUtc), esc(report.applicationVersion));
 
     h += QStringLiteral("<h2>Case</h2><table>");
     h += row(QStringLiteral("Case identifier"), report.caseId);

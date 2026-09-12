@@ -32,17 +32,17 @@ jobs:
       - name: Copy executable and dependencies
         shell: msys2 {0}
         run: |
-          mkdir "hashcat-gui-${{ github.ref_name }}"
-          mkdir "hashcat-gui-${{ github.ref_name }}/docs"
+          mkdir "casekey-${{ github.ref_name }}"
+          mkdir "casekey-${{ github.ref_name }}/docs"
           # copy binary
-          cp build/hashcat-gui.exe "hashcat-gui-${{ github.ref_name }}/"
+          cp build/casekey.exe "casekey-${{ github.ref_name }}/"
           # copy docs
-          cp README.md CHANGELOG.md FAQ.md LICENSE "hashcat-gui-${{ github.ref_name }}/docs/"
+          cp README.md CHANGELOG.md FAQ.md LICENSE "casekey-${{ github.ref_name }}/docs/"
           # bundle needed libraries
-          cd "hashcat-gui-${{ github.ref_name }}/"
-          ldd hashcat-gui.exe | grep /ucrt64 | awk '{print $3}' | xargs -i cp {} .
+          cd "casekey-${{ github.ref_name }}/"
+          ldd casekey.exe | grep /ucrt64 | awk '{print $3}' | xargs -i cp {} .
           # Run Qt's windows deployment tool
-          windeployqt6.exe hashcat-gui.exe \
+          windeployqt6.exe casekey.exe \
             --release \
             --no-libraries \
             --no-translations \
@@ -56,9 +56,9 @@ jobs:
       - name: Zip release artifacts
         shell: msys2 {0}
         run: |
-          zip -r "hashcat-gui-${{ github.ref_name }}-windows-x64.zip" "hashcat-gui-${{ github.ref_name }}"
+          zip -r "casekey-${{ github.ref_name }}-windows-x64.zip" "casekey-${{ github.ref_name }}"
 
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
-          files: "hashcat-gui-${{ github.ref_name }}-windows-x64.zip"
+          files: "casekey-${{ github.ref_name }}-windows-x64.zip"

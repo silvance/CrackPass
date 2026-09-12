@@ -34,8 +34,8 @@ foreach(test_name ${FORENSIC_TESTS})
 endforeach()
 
 # Optional real-tool integration layer (compiles always; skips at runtime when
-# external tools/corpus are absent). Disable with -DCRACKPASS_BUILD_INTEGRATION=OFF.
-option(CRACKPASS_BUILD_INTEGRATION "Build the optional real-tool integration tests" ON)
-if(CRACKPASS_BUILD_INTEGRATION)
+# external tools/corpus are absent). Disable with -DCASEKEY_BUILD_INTEGRATION=OFF.
+option(CASEKEY_BUILD_INTEGRATION "Build the optional real-tool integration tests" ON)
+if(CASEKEY_BUILD_INTEGRATION)
     add_subdirectory(integration)
 endif()

@@ -1,6 +1,6 @@
-# Gap analysis: CrackPass vs. Passware Kit Forensic
+# Gap analysis: CaseKey vs. Passware Kit Forensic
 
-This assesses what CrackPass would still be missing compared with a mature
+This assesses what CaseKey would still be missing compared with a mature
 commercial suite such as Passware Kit Forensic, grouped by the effort/feasibility
 of closing each gap. It reflects the architecture built so far (case workspace +
 evidence intake with SHA-256/metadata + content-based type detection + `*2john`
@@ -8,7 +8,7 @@ hash extraction for Office/PDF/ZIP/RAR/7-Zip/KeePass + a guided attack planner +
 an attached, `--status-json`-driven job queue + recovered-credential capture +
 HTML/JSON reporting), all running fully offline.
 
-## What CrackPass already matches
+## What CaseKey already matches
 Dictionary / rules / mask / hybrid / brute-force attacks (via hashcat, GPU
 accelerated); case-centric evidence handling with integrity hashing and a
 tamper-evident audit trail; content-based format detection; hash extraction for an
@@ -89,7 +89,7 @@ Gaps that are less about code and more about a sustained commercial operation.
 ---
 
 ## Summary
-CrackPass credibly covers the **dictionary/rules/mask/hybrid + GPU** workflow with
+CaseKey credibly covers the **dictionary/rules/mask/hybrid + GPU** workflow with
 strong forensic hygiene (integrity, audit, reproducible reports) entirely offline.
 The largest real differentiators of a commercial suite are **memory-based instant
 decryption**, **full-disk/mobile coverage**, **breadth of maintained format

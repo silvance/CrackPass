@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(hashcat-gui CXX)
+project(casekey CXX)
 
 # Set version
 set(GUI_VERSION 0.7.1)
@@ -111,7 +111,7 @@ target_include_directories(forensic_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(forensic_core PUBLIC Qt6::Core)
 target_compile_options(forensic_core PRIVATE -Wall -Wextra -Wpedantic)
 
-add_executable(hashcat-gui WIN32
+add_executable(casekey WIN32
     src/aboutdialog.h
     src/aboutdialog.cpp
     src/helperutils.h
@@ -142,11 +142,11 @@ add_executable(hashcat-gui WIN32
     src/settingsdialog.ui
 )
 
-target_compile_options(hashcat-gui PRIVATE -Wall -Wextra -Wpedantic)
+target_compile_options(casekey PRIVATE -Wall -Wextra -Wpedantic)
 
-target_link_libraries(hashcat-gui PRIVATE forensic_core Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Concurrent)
+target_link_libraries(casekey PRIVATE forensic_core Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Concurrent)
 
-install(TARGETS hashcat-gui RUNTIME DESTINATION bin)
+install(TARGETS casekey RUNTIME DESTINATION bin)
 
 # ---------------------------------------------------------------------------
 # Unit tests (non-UI logic). Run with: ctest --test-dir build

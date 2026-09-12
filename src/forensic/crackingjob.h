@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  */
 #ifndef FORENSIC_CRACKINGJOB_H
 #define FORENSIC_CRACKINGJOB_H

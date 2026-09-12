@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  *
  * OPTIONAL real-tool integration test. It exercises the actual hashcat and
  * *2john binaries against a known corpus. It SKIPS cleanly when those tools or
@@ -31,9 +31,9 @@ void TestIntegration::initTestCase()
 {
     m_env = IntegrationEnv::detect();
     if (!m_env.hashcatAvailable())
-        QSKIP("hashcat not available (set CRACKPASS_HASHCAT) - integration test skipped");
+        QSKIP("hashcat not available (set CASEKEY_HASHCAT) - integration test skipped");
     if (!m_env.corpusAvailable())
-        QSKIP("corpus not available (set CRACKPASS_CORPUS) - integration test skipped");
+        QSKIP("corpus not available (set CASEKEY_CORPUS) - integration test skipped");
     m_corpus = loadCorpus(m_env.corpusDir);
     if (m_corpus.isEmpty())
         QSKIP("corpus manifest empty - integration test skipped");

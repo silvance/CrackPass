@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-# SPDX-FileCopyrightText: CrackPass contributors
+# SPDX-FileCopyrightText: CaseKey contributors
 #
-# Offline generator for the CrackPass integration test corpus.
+# Offline generator for the CaseKey integration test corpus.
 #
 # It creates synthetic encrypted artifacts with KNOWN passwords for the
 # supported formats, plus edge-case fixtures, and writes a manifest.json the
@@ -11,7 +11,7 @@
 # with a clear message. No network access is used.
 #
 # Usage:  python3 generate_corpus.py <output-dir>
-# Then:   set CRACKPASS_CORPUS=<output-dir> before running the integration test.
+# Then:   set CASEKEY_CORPUS=<output-dir> before running the integration test.
 
 import json, os, shutil, subprocess, sys
 
@@ -39,7 +39,7 @@ def main(outdir):
 
     plain_src = os.path.join(outdir, "_plain_source.txt")
     with open(plain_src, "w", encoding="utf-8") as f:
-        f.write("secret document body for CrackPass integration testing\n")
+        f.write("secret document body for CaseKey integration testing\n")
 
     # --- Edge cases that need no crypto tool ---
     # Non-encrypted artifact.
@@ -117,7 +117,7 @@ def main(outdir):
     print(f"Corpus written to {outdir}")
     print(f"  produced: {', '.join(made) or '(none)'}")
     print(f"  skipped:  {', '.join(skipped) or '(none)'}")
-    print("Set CRACKPASS_CORPUS to this directory to enable the integration test.")
+    print("Set CASEKEY_CORPUS to this directory to enable the integration test.")
     print("For skipped formats, add a fixture file + a manifest.json entry "
           "{file,type,encrypted,password} manually.")
 

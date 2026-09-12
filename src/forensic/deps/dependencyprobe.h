@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  *
  * Discovers and health-checks the external forensic toolchain for the
  * "Dependency Doctor". Resolution order for every tool is: explicit settings

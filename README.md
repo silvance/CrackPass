@@ -1,6 +1,6 @@
-# CrackPass
+# CaseKey
 
-CrackPass is an **offline, examiner-friendly password-recovery application for
+CaseKey is an **offline, examiner-friendly password-recovery application for
 authorized digital-forensics work**. It provides a case-centric forensic
 workflow — evidence intake with integrity hashing, hash extraction from
 encrypted files/containers, guided attack planning, monitored cracking, a
@@ -8,14 +8,14 @@ tamper-evident audit trail, and examiner reports — on top of established
 engines: [**hashcat**](https://github.com/hashcat/hashcat/) for cracking and the
 **John the Ripper Jumbo** `*2john` utilities for hash extraction.
 
-CrackPass runs fully offline with **no cloud dependencies**.
+CaseKey runs fully offline with **no cloud dependencies**.
 
 ## Built on hashcat-gui
 
-CrackPass began as, and still contains, a fork of the excellent
+CaseKey began as, and still contains, a fork of the excellent
 [**hashcat-gui** by Rainer Größlinger (`rgroesslinger/hashcat-gui`)](https://github.com/rgroesslinger/hashcat-gui).
-That project is preserved intact as **Advanced Hashcat Mode** — the full
-low-level hashcat interface — and CrackPass adds a **Forensic / Guided Mode**
+That project is preserved intact as **Advanced Mode** — the full
+low-level hashcat interface — and CaseKey adds a **Forensic / Guided Mode**
 alongside it. The fork stays close to upstream so improvements there can be
 merged in; the forensic layer lives in new modules (`src/forensic/`) rather than
 rewrites of the original UI.
@@ -27,7 +27,7 @@ Full credit for the underlying GUI goes to the upstream project and its authors.
 - **Forensic / Guided Mode** — create/open a case, add an artifact (referenced
   or imported as an immutable working copy), detect its type, extract a hash,
   plan an attack from case knowledge, run and monitor it, and produce a report.
-- **Advanced Hashcat Mode** — the original hashcat-gui, unchanged, for full
+- **Advanced Mode** — the original hashcat-gui, unchanged, for full
   manual control. Nothing about hashcat is hidden; the guided mode always shows
   the exact hashcat command before anything runs.
 
@@ -36,7 +36,7 @@ Full credit for the underlying GUI goes to the upstream project and its authors.
 - Supported extraction formats (initial set): Microsoft Office, PDF, ZIP, RAR,
   7-Zip, KeePass.
 - ✅ Compatible with hashcat v7.x.
-- CrackPass orchestrates external tools; it does **not** bundle or replace
+- CaseKey orchestrates external tools; it does **not** bundle or replace
   hashcat or John the Ripper. See `docs/DEPLOYMENT.md` for how to provide them.
 
 ## Documentation
@@ -45,7 +45,7 @@ Full credit for the underlying GUI goes to the upstream project and its authors.
   forensic workstation; locating/bundling hashcat, the `*2john` tools, runtime
   libraries, rules and wordlists.
 - [`docs/FORENSIC_VALIDATION.md`](docs/FORENSIC_VALIDATION.md) — the correctness
-  and integrity invariants CrackPass enforces.
+  and integrity invariants CaseKey enforces.
 - [`docs/INTEGRATION_TESTING.md`](docs/INTEGRATION_TESTING.md) — the optional
   real-tool integration tests and diagnostic runner.
 - [`docs/THIRD_PARTY.md`](docs/THIRD_PARTY.md) — third-party components and their
@@ -61,12 +61,12 @@ no hidden configuration files. **Forensic Mode → Tool Status** ("Dependency
 Doctor") shows what was detected, versions, GPU/backend information and a
 hashcat self-test.
 
-CrackPass also auto-discovers a bundled **portable layout** next to the
+CaseKey also auto-discovers a bundled **portable layout** next to the
 executable, with manual overrides always available:
 
 ```
-CrackPass/
-  CrackPass(.exe)
+CaseKey/
+  CaseKey(.exe)
   tools/
     hashcat/     # hashcat + backends
     john/        # John the Ripper Jumbo *2john utilities
@@ -102,8 +102,8 @@ cmake --build build
 
 ## License
 
-CrackPass is licensed **GPL-3.0-or-later** (see [`LICENSE`](LICENSE)), consistent
+CaseKey is licensed **GPL-3.0-or-later** (see [`LICENSE`](LICENSE)), consistent
 with the upstream hashcat-gui project. Third-party components and their licenses
 are inventoried in [`docs/THIRD_PARTY.md`](docs/THIRD_PARTY.md). hashcat and the
 John the Ripper Jumbo utilities are separate projects with their own licenses and
-are not redistributed by CrackPass by default.
+are not redistributed by CaseKey by default.

@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  *
  * Diagnostic integration-test runner for a disconnected forensic workstation.
  * Prints the detected toolchain and runs each corpus fixture through the full
@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
     QTextStream out(stdout);
     const IntegrationEnv env = IntegrationEnv::detect();
 
-    out << "=== CrackPass integration diagnostics ===\n\n";
+    out << "=== CaseKey integration diagnostics ===\n\n";
     out << "hashcat:\n";
     out << "  path:    " << (env.hashcat.available ? env.hashcat.program : QStringLiteral("(not found)")) << '\n';
     out << "  version: " << (env.hashcat.version.isEmpty() ? QStringLiteral("(unknown)") : env.hashcat.version) << '\n';

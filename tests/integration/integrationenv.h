@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: CrackPass contributors
+ * SPDX-FileCopyrightText: CaseKey contributors
  *
  * Shared discovery/probing for the OPTIONAL integration layer. It locates the
  * real external tools (hashcat and the John the Ripper Jumbo *2john utilities)
@@ -9,12 +9,12 @@
  * report/skip cleanly -- they never require the tools to be present to build.
  *
  * Environment:
- *   CRACKPASS_HASHCAT    - path to the hashcat executable (else looked up on PATH)
- *   CRACKPASS_TOOLS_DIR  - directory holding the *2john utilities (else PATH)
- *   CRACKPASS_CORPUS     - directory holding fixtures + manifest.json
+ *   CASEKEY_HASHCAT    - path to the hashcat executable (else looked up on PATH)
+ *   CASEKEY_TOOLS_DIR  - directory holding the *2john utilities (else PATH)
+ *   CASEKEY_CORPUS     - directory holding fixtures + manifest.json
  */
-#ifndef CRACKPASS_INTEGRATIONENV_H
-#define CRACKPASS_INTEGRATIONENV_H
+#ifndef CASEKEY_INTEGRATIONENV_H
+#define CASEKEY_INTEGRATIONENV_H
 
 #include <QMap>
 #include <QString>
@@ -52,4 +52,4 @@ public:
 
 }} // namespace forensic::itest
 
-#endif // CRACKPASS_INTEGRATIONENV_H
+#endif // CASEKEY_INTEGRATIONENV_H
