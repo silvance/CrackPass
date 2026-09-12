@@ -34,6 +34,7 @@ private slots:
     void reopenPersistsEvidenceAndAudit();
     void auditChainRecordsActions();
     void probeEncryptionUsesWorkingCopyWhenOriginalGone();
+    void mutationRefusesAndLeavesNoStateWhenAuditFails();
 };
 
 void TestCaseWorkspace::createScaffoldsDirsAndManifest()
@@ -135,6 +136,38 @@ void TestCaseWorkspace::probeEncryptionUsesWorkingCopyWhenOriginalGone()
     QVERIFY(QFile::remove(pdf));
 
     QCOMPARE(ws->probeEncryption(r.item.id), forensic::EncryptionState::Encrypted);
+}
+
+void TestCaseWorkspace::mutationRefusesAndLeavesNoStateWhenAuditFails()
+{
+    // A mutation whose audit entry cannot be committed must be refused whole:
+    // no in-memory state, and no orphaned metadata file on disk.
+    QTemporaryDir dir, src;
+    auto ws = CaseWorkspace::create(dir.path(), CaseInfo{});
+    QVERIFY(ws);
+
+    // Sabotage the audit log so append() fails deterministically (even as root):
+    // replace the log file with a directory, which cannot be opened for writing.
+    const QString auditPath = ws->audit().filePath();
+    QVERIFY(QFile::remove(auditPath));
+    QVERIFY(QDir().mkpath(auditPath));
+
+    const int before = ws->evidence().size();
+    auto r = ws->addEvidence(makePdf(src));
+    QVERIFY(!r.ok);                              // refused
+    QVERIFY(!r.error.isEmpty());
+    QCOMPARE(ws->evidence().size(), before);     // no phantom in-memory state
+
+    // And the metadata write was rolled back: reopening (after restoring a
+    // valid audit log) shows no evidence persisted.
+    QDir(auditPath).removeRecursively();
+    { QFile f(auditPath); f.open(QIODevice::WriteOnly); f.close(); } // empty valid log
+    const QString root = ws->rootPath();
+    ws.reset();
+    QString err;
+    auto reopened = CaseWorkspace::open(root, &err);
+    QVERIFY2(reopened != nullptr, qPrintable(err));
+    QCOMPARE(reopened->evidence().size(), 0);
 }
 
 QTEST_GUILESS_MAIN(TestCaseWorkspace)
