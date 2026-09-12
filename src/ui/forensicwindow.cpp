@@ -17,10 +17,14 @@
 #include "forensic/execution/hashcatexecutionbackend.h"
 #include "forensic/execution/hashcatstatus.h"
 #include "forensic/planner/attackcommandbuilder.h"
+#include "forensic/report/reportbuilder.h"
+#include "forensic/report/reportrenderer.h"
+#include "config.h"
 #include "settingsmanager.h"
 
 #include <QApplication>
 #include <QDir>
+#include <QFile>
 #include <QFileDialog>
 #include <QHeaderView>
 #include <QInputDialog>
@@ -33,6 +37,9 @@
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QToolBar>
+#include <QDateTime>
+#include <QDesktopServices>
+#include <QUrl>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -155,6 +162,9 @@ QWidget *ForensicWindow::buildJobsTab()
     buttonRow->addWidget(pause);
     buttonRow->addWidget(resume);
     buttonRow->addWidget(stop);
+    auto *report = new QPushButton(tr("Generate Report"), w);
+    connect(report, &QPushButton::clicked, this, &ForensicWindow::generateReportForSelectedJob);
+    buttonRow->addWidget(report);
     buttonRow->addStretch();
     layout->addLayout(buttonRow);
 
@@ -407,6 +417,10 @@ void ForensicWindow::planAttackSelected()
     job.attackMode = spec.attackMode;
     job.hashcatPath = hashcatPath;
     job.hashcatArgs = forensic::AttackCommandBuilder::buildArgs(spec);
+    job.hashFile = spec.hashFile;
+    job.wordlists = spec.wordlists;
+    job.rules = spec.rules;
+    job.mask = spec.mask;
 
     const QString jobDir = m_workspace->jobDir(job.id);
     QDir().mkpath(jobDir);
@@ -623,3 +637,63 @@ void ForensicWindow::stopSelectedJob()
     if (r >= 0 && m_jobsTable->item(r, 0))
         m_queue->stop(m_jobsTable->item(r, 0)->data(Qt::UserRole).toUuid());
 }
+
+void ForensicWindow::generateReportForSelectedJob()
+{
+    if (!m_workspace)
+        return;
+    const int r = m_jobsTable->currentRow();
+    if (r < 0 || !m_jobsTable->item(r, 0)) {
+        QMessageBox::information(this, tr("Generate Report"), tr("Select a job first."));
+        return;
+    }
+    const QUuid jobId = m_jobsTable->item(r, 0)->data(Qt::UserRole).toUuid();
+    const forensic::CrackingJob job = m_queue->hasJob(jobId) ? m_queue->jobById(jobId)
+                                                             : forensic::CrackingJob{};
+    forensic::CrackingJob target = job;
+    if (target.id.isNull()) {
+        for (const auto &j : m_workspace->jobs())
+            if (j.id == jobId) target = j;
+    }
+    if (target.id.isNull())
+        return;
+
+    const forensic::RecoveryReport rep =
+        forensic::ReportBuilder::build(*m_workspace, target, QStringLiteral(GUI_VERSION));
+
+    const QString stamp = QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd-HHmmss"));
+    const QString base = QStringLiteral("report-%1-%2")
+                             .arg(jobId.toString(QUuid::WithoutBraces).left(8), stamp);
+    QDir().mkpath(m_workspace->reportsDir());
+    const QString htmlPath = QDir(m_workspace->reportsDir()).filePath(base + QStringLiteral(".html"));
+    const QString jsonPath = QDir(m_workspace->reportsDir()).filePath(base + QStringLiteral(".json"));
+
+    bool ok = true;
+    {
+        QFile f(htmlPath);
+        ok = f.open(QIODevice::WriteOnly | QIODevice::Truncate)
+             && f.write(forensic::ReportRenderer::toHtml(rep).toUtf8()) >= 0;
+    }
+    {
+        QFile f(jsonPath);
+        ok = ok && f.open(QIODevice::WriteOnly | QIODevice::Truncate)
+             && f.write(forensic::ReportRenderer::toJson(rep)) >= 0;
+    }
+    if (!ok) {
+        QMessageBox::warning(this, tr("Generate Report"), tr("Could not write the report files."));
+        return;
+    }
+    if (m_workspace)
+        m_workspace->audit().append(
+            m_workspace->info().examiner.isEmpty() ? QStringLiteral("system") : m_workspace->info().examiner,
+            QStringLiteral("report_generated"), QStringLiteral("job"),
+            jobId.toString(QUuid::WithoutBraces), {});
+
+    QMessageBox box(this);
+    box.setWindowTitle(tr("Report generated"));
+    box.setText(tr("Human-readable and JSON reports written to:\n%1\n%2").arg(htmlPath, jsonPath));
+    box.setStandardButtons(QMessageBox::Open | QMessageBox::Ok);
+    if (box.exec() == QMessageBox::Open)
+        QDesktopServices::openUrl(QUrl::fromLocalFile(htmlPath));
+}
+

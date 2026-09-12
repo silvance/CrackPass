@@ -56,6 +56,10 @@ struct CrackingJob
 
     QStringList hashcatArgs;   // exact argv passed to hashcat
     QString hashcatPath;
+    QString hashFile;          // extracted-hash file being attacked
+    QStringList wordlists;     // wordlists used (for reporting)
+    QStringList rules;         // rule files used
+    QString mask;              // mask used (a=3/6/7)
     QString hashcatVersion;
     QVector<ComputeDevice> devices;
 

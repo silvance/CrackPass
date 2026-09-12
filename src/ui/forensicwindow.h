@@ -50,6 +50,7 @@ private slots:
     void pauseSelectedJob();
     void resumeSelectedJob();
     void stopSelectedJob();
+    void generateReportForSelectedJob();
 
 private:
     void refreshCaseHeader();

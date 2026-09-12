@@ -4,6 +4,8 @@
  */
 #include "caseworkspace.h"
 
+#include "extraction/toolresolver.h"
+
 
 #include <QDir>
 #include <QFile>
@@ -297,6 +299,7 @@ CaseWorkspace::ExtractionOutcome CaseWorkspace::extractHash(const QUuid &evidenc
 
     rec.endedUtc = QDateTime::currentDateTimeUtc();
     rec.extractorId = result.extractorId;
+    rec.extractorVersion = ctx.tools ? ctx.tools->resolve(extractor->toolId()).version : QString();
     rec.toolProgram = result.toolProgram;
     rec.argv = result.argv;
     rec.status = Extraction::statusToString(result.status);
