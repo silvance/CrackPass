@@ -4,6 +4,7 @@
  */
 #include "forensicsettingsdialog.h"
 #include "settingsmanager.h"
+#include "forensic/deps/dependencyprobe.h"
 
 #include <QDialogButtonBox>
 #include <QFileDialog>
@@ -32,7 +33,9 @@ ForensicSettingsDialog::ForensicSettingsDialog(QWidget *parent)
 
     auto *extractors = new QGroupBox(tr("Extraction utilities (John the Ripper Jumbo)"), this);
     auto *xf = new QFormLayout(extractors);
-    for (const QString &id : {"office2john", "pdf2john", "zip2john", "rar2john", "7z2john", "keepass2john"})
+    // Driven by the toolchain's own extractor list so a new extractor gets a
+    // settings field automatically (single source of truth with the Doctor).
+    for (const QString &id : forensic::DependencyProbe::extractorIds())
         addPathRow(xf, id, QStringLiteral("tools/") + id, false);
     root->addWidget(extractors);
 

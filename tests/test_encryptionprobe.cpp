@@ -29,6 +29,7 @@ private slots:
     void pdfEncryptDict();
     void pdfNoEncrypt();
     void keepassAlwaysEncrypted();
+    void bitlockerAlwaysEncrypted();
     void otherTypesUnknown();
 };
 
@@ -75,6 +76,14 @@ void TestEncryptionProbe::keepassAlwaysEncrypted()
     QTemporaryDir d;
     const ArtifactType kp{"keepass-kdbx", "KeePass", 0.98};
     QCOMPARE(EncryptionProbe::probe(kp, write(d, "a.kdbx", QByteArray("\x03\xd9\xa2\x9a", 4))),
+             EncryptionState::Encrypted);
+}
+
+void TestEncryptionProbe::bitlockerAlwaysEncrypted()
+{
+    QTemporaryDir d;
+    const ArtifactType bl{"bitlocker", "BitLocker volume", 0.97};
+    QCOMPARE(EncryptionProbe::probe(bl, write(d, "vol.bin", QByteArray("\xEB\x58\x90-FVE-FS-", 11))),
              EncryptionState::Encrypted);
 }
 

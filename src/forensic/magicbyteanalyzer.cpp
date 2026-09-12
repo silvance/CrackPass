@@ -15,6 +15,10 @@ MagicByteAnalyzer::MagicByteAnalyzer()
     m_signatures = {
         {0, QByteArray("\x25\x50\x44\x46", 4),                 QStringLiteral("pdf"),
          QStringLiteral("PDF document"),                        0.95},
+        // BitLocker volume: the FVE signature "-FVE-FS-" sits at offset 3 in the
+        // volume header (both BitLocker and BitLocker-To-Go).
+        {3, QByteArray("-FVE-FS-", 8),                         QStringLiteral("bitlocker"),
+         QStringLiteral("BitLocker-encrypted volume"),          0.97},
         {0, QByteArray("\x03\xd9\xa2\x9a", 4),                 QStringLiteral("keepass-kdbx"),
          QStringLiteral("KeePass 2 database (kdbx)"),           0.98},
         {0, QByteArray("\x37\x7a\xbc\xaf\x27\x1c", 6),         QStringLiteral("7z"),

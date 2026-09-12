@@ -27,6 +27,7 @@ private slots:
     void zipWinZipVsPkzip();
     void rarVariants();
     void sevenZipAndKeePass();
+    void bitlocker();
     void unrecognizedIsEmpty();
 };
 
@@ -81,12 +82,19 @@ void TestModeResolution::sevenZipAndKeePass()
     QCOMPARE(modeValues(modes::forKeePass("$keepass$*1*...")), (QVector<quint32>{13400}));
 }
 
+void TestModeResolution::bitlocker()
+{
+    QCOMPARE(modeValues(modes::forBitLocker("$bitlocker$0$16$aaaa$...")), (QVector<quint32>{22100}));
+    QVERIFY(modes::forBitLocker("$7z$0$...").isEmpty());
+}
+
 void TestModeResolution::unrecognizedIsEmpty()
 {
     QVERIFY(modes::forOffice("$notoffice$").isEmpty());
     QVERIFY(modes::forPdf("garbage").isEmpty());
     QVERIFY(modes::forZip("$rar5$").isEmpty());
     QVERIFY(modes::forKeePass("$7z$").isEmpty());
+    QVERIFY(modes::forBitLocker("$keepass$").isEmpty());
 }
 
 QTEST_GUILESS_MAIN(TestModeResolution)

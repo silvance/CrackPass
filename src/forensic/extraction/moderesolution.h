@@ -27,6 +27,7 @@ QVector<HashcatModeOption> forZip(const QString &hash);
 QVector<HashcatModeOption> forRar(const QString &hash);
 QVector<HashcatModeOption> forSevenZip(const QString &hash);
 QVector<HashcatModeOption> forKeePass(const QString &hash);
+QVector<HashcatModeOption> forBitLocker(const QString &hash);
 
 } // namespace modes
 } // namespace forensic

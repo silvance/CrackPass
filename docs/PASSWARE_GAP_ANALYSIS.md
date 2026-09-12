@@ -39,9 +39,11 @@ Real engineering, but using established, documented techniques.
 - **Broad automatic encryption/type identification** across hundreds of formats
   (Passware advertises ~340). Requires a large, maintained signature/structural
   detection library rather than the current focused table.
-- **Full-disk / container encryption end-to-end** — BitLocker (`-m 22100`),
-  VeraCrypt/TrueCrypt (137xx), LUKS (14600 / 29xxx): extraction, attack, and then
-  mounting/decrypting the recovered volume.
+- **Full-disk / container encryption end-to-end** — BitLocker
+  extraction + attack is **supported** (`bitlocker2john` → `-m 22100`); still
+  open here and for VeraCrypt/TrueCrypt (137xx) and LUKS (14600 / 29xxx) is the
+  rest of the chain: their extraction plus mounting/decrypting the recovered
+  volume once the password is known.
 - **Distributed / multi-node cracking** — coordinate multiple GPUs/hosts on an
   isolated LAN (hashcat brain, or a custom agent), analogous to Passware Agent but
   offline. (Cloud bursting is intentionally out of scope.)
