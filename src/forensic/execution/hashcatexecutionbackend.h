@@ -29,7 +29,7 @@ public:
 
     void start(const CrackingJob &job, const StartOptions &opts) override;
     void pause(const QUuid &jobId) override;
-    void resume(const QUuid &jobId) override;
+    void resume(const CrackingJob &job, const StartOptions &opts) override;
     void stop(const QUuid &jobId) override;
 
     // Exposed for testing: compose the argv passed to hashcat.

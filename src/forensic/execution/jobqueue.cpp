@@ -59,6 +59,38 @@ QUuid JobQueue::enqueue(const CrackingJob &job, const JobPaths &paths)
     return j.id;
 }
 
+void JobQueue::restore(const CrackingJob &job, const JobPaths &paths)
+{
+    if (indexOf(job.id) >= 0)
+        return; // already known to the queue
+
+    CrackingJob j = job;
+    // A job that was still in flight when the previous session ended is no
+    // longer running; present it as Paused so the examiner can resume it from
+    // its restore file. Terminal states (Recovered/Exhausted/Stopped/Failed)
+    // are left untouched as history.
+    if (j.state == JobState::Running || j.state == JobState::Preparing
+        || j.state == JobState::Pending)
+        j.state = JobState::Paused;
+
+    m_jobs.append(j);
+    m_paths.insert(j.id, paths);
+    emit jobChanged(j); // display + persist the (possibly normalized) state; never auto-start
+}
+
+JobExecutionBackend::StartOptions JobQueue::optionsFor(const QUuid &id, bool restore) const
+{
+    const JobPaths p = m_paths.value(id);
+    JobExecutionBackend::StartOptions opts;
+    opts.workingDir = p.workingDir;
+    opts.sessionName = p.sessionName;
+    opts.potfilePath = p.potfilePath;
+    opts.outfilePath = p.outfilePath;
+    opts.restorePath = p.restorePath;
+    opts.restore = restore;
+    return opts;
+}
+
 void JobQueue::tryStartNext()
 {
     if (!m_running.isNull())
@@ -69,16 +101,7 @@ void JobQueue::tryStartNext()
             m_running = id;
             m_jobs[i].startedUtc = QDateTime::currentDateTimeUtc();
             setState(id, JobState::Preparing);
-
-            const JobPaths p = m_paths.value(id);
-            JobExecutionBackend::StartOptions opts;
-            opts.workingDir = p.workingDir;
-            opts.sessionName = p.sessionName;
-            opts.potfilePath = p.potfilePath;
-            opts.outfilePath = p.outfilePath;
-            opts.restorePath = p.restorePath;
-            opts.restore = false;
-            m_backend->start(m_jobs.at(i), opts);
+            m_backend->start(m_jobs.at(i), optionsFor(id, false));
             return;
         }
     }
@@ -191,15 +214,7 @@ void JobQueue::resume(const QUuid &jobId)
         return; // wait until the queue is free
     m_running = jobId;
     setState(jobId, JobState::Preparing);
-    const JobPaths p = m_paths.value(jobId);
-    JobExecutionBackend::StartOptions opts;
-    opts.workingDir = p.workingDir;
-    opts.sessionName = p.sessionName;
-    opts.potfilePath = p.potfilePath;
-    opts.outfilePath = p.outfilePath;
-    opts.restorePath = p.restorePath;
-    opts.restore = true;
-    m_backend->resume(jobId);
+    m_backend->resume(m_jobs.at(i), optionsFor(jobId, true));
 }
 
 void JobQueue::stop(const QUuid &jobId)

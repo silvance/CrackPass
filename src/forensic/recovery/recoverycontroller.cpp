@@ -72,4 +72,12 @@ QUuid RecoveryController::queueRecoveryJob(const AttackJobSpec &spec, const QUui
     return m_queue->enqueue(job, buildPaths(jobDir, job.id));
 }
 
+void RecoveryController::restoreJobs()
+{
+    if (!m_workspace)
+        return;
+    for (const CrackingJob &job : m_workspace->jobs())
+        m_queue->restore(job, buildPaths(m_workspace->jobDir(job.id), job.id));
+}
+
 } // namespace forensic
