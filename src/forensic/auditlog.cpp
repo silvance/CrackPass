@@ -4,9 +4,12 @@
  */
 #include "auditlog.h"
 
+#include "atomicwrite.h"
+
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QTextStream>
 #include <QUuid>
@@ -65,14 +68,52 @@ QString AuditLog::computeHash(const QString &prevHash, const AuditEvent &event)
     return QString::fromLatin1(QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex());
 }
 
+bool AuditLog::writeAnchor(QString *error) const
+{
+    QJsonObject obj;
+    obj[QStringLiteral("headHash")] = m_headHash;
+    obj[QStringLiteral("eventCount")] = static_cast<double>(m_events.size());
+    return writeFileAtomic(anchorPath(),
+                           QJsonDocument(obj).toJson(QJsonDocument::Compact), error);
+}
+
 bool AuditLog::load(QString *error)
 {
     m_events.clear();
     m_headHash.clear();
 
+    // Read the anchor sidecar first (if present) so we can detect tail
+    // truncation and whole-log deletion, which chain verification alone cannot.
+    bool anchorPresent = false;
+    QString anchorHead;
+    int anchorCount = 0;
+    {
+        QFile af(anchorPath());
+        if (af.exists() && af.open(QIODevice::ReadOnly)) {
+            QJsonParseError aerr;
+            const QJsonDocument adoc = QJsonDocument::fromJson(af.readAll(), &aerr);
+            if (aerr.error != QJsonParseError::NoError || !adoc.isObject()) {
+                if (error) *error = QStringLiteral("Corrupt audit anchor: %1").arg(aerr.errorString());
+                return false;
+            }
+            anchorPresent = true;
+            anchorHead = adoc.object().value(QStringLiteral("headHash")).toString();
+            anchorCount = adoc.object().value(QStringLiteral("eventCount")).toInt();
+        }
+    }
+
     QFile file(m_filePath);
-    if (!file.exists())
+    if (!file.exists()) {
+        // No log. Consistent only if the anchor agrees there were no events;
+        // an anchor expecting events means the whole log was deleted.
+        if (anchorPresent && anchorCount > 0) {
+            m_lastError = QStringLiteral("Audit log is missing but its anchor expects %1 event(s).")
+                              .arg(anchorCount);
+            if (error) *error = m_lastError;
+            return false;
+        }
         return true; // empty log is valid
+    }
 
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         if (error)
@@ -104,6 +145,17 @@ bool AuditLog::load(QString *error)
         if (error) *error = QStringLiteral("Audit log integrity check failed: %1").arg(verr);
         return false;
     }
+
+    // Cross-check against the anchor: a mismatch means entries were dropped from
+    // the end (or added out of band), which the chain alone cannot catch.
+    if (anchorPresent && (m_events.size() != anchorCount || m_headHash != anchorHead)) {
+        m_lastError = QStringLiteral(
+            "Audit log does not match its anchor (expected %1 event(s), found %2); "
+            "the log appears to have been truncated or altered.")
+                          .arg(anchorCount).arg(m_events.size());
+        if (error) *error = m_lastError;
+        return false;
+    }
     return true;
 }
 
@@ -127,6 +179,7 @@ bool AuditLog::append(const QString &actor, const QString &action,
     const QByteArray line = QJsonDocument(e.toJson()).toJson(QJsonDocument::Compact) + '\n';
 
     QFile file(m_filePath);
+    const qint64 sizeBefore = file.exists() ? QFileInfo(m_filePath).size() : 0;
     if (!file.open(QIODevice::Append | QIODevice::Text)) {
         m_lastError = QStringLiteral("Cannot open audit log for append: %1").arg(file.errorString());
         return false; // do NOT advance the in-memory chain
@@ -137,9 +190,21 @@ bool AuditLog::append(const QString &actor, const QString &action,
     }
     file.close();
 
-    // Only now that the event is durably written do we advance the chain.
+    // Tentatively advance the chain, then update the anchor to match. The event
+    // and its anchor must move together: if the anchor cannot be written, undo
+    // the log line and the in-memory advance so the two never disagree.
     m_events.append(e);
     m_headHash = e.hash;
+    QString anchorErr;
+    if (!writeAnchor(&anchorErr)) {
+        QFile trunc(m_filePath);
+        if (trunc.open(QIODevice::ReadWrite))
+            trunc.resize(sizeBefore);
+        m_events.removeLast();
+        m_headHash = e.prevHash;
+        m_lastError = QStringLiteral("Failed to update audit anchor: %1").arg(anchorErr);
+        return false;
+    }
     return true;
 }
 

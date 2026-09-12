@@ -32,17 +32,28 @@ continue on unverifiable state.
   breaks the hash linkage between an event and its successor;
   `CaseWorkspace::open()` propagates that failure, so a case with such a
   modified audit log **never opens as if valid**.
-- **Known limitation:** removing entries from the **end** of the log
-  (whole-tail truncation) leaves a shorter but internally consistent chain, so
-  it is **not** detected by chain verification alone. Detecting it requires an
-  external anchor (the expected head hash and event count stored outside the
-  log); that anchor is planned and **not yet implemented**. Do not rely on the
-  audit log alone to prove that no trailing events were dropped.
+- Removing entries from the **end** of the log (whole-tail truncation) leaves a
+  shorter but internally consistent chain, which chain verification alone cannot
+  catch. To detect it the log keeps a small **anchor** sidecar
+  (`audit.log.jsonl.anchor`) recording the expected head hash and event count;
+  `AuditLog::load()` compares the log against the anchor and **fails on any
+  mismatch**, so tail truncation and whole-log deletion (anchor present, log
+  gone) are both detected. `AuditLog::append()` updates the anchor atomically as
+  part of each append (rolling back the log line if the anchor cannot be
+  written), so the two never disagree after a successful append.
+- **Residual limitation:** the anchor defends against accidental truncation and
+  naive tampering. An adversary with write access who rewrites **both** the log
+  and the anchor consistently can still shorten history undetectably — the chain
+  hash prevents forging *different* events, but not a coordinated truncation of
+  both files. Proving that against a motivated local attacker requires an
+  off-box anchor (e.g. an external append-only store), which is out of scope.
 - `AuditLog::append()` writes and flushes the event first and only then advances
-  the in-memory head. If the write fails it **reports failure and does not
-  advance the chain**; `CaseWorkspace` operations surface that failure.
+  the in-memory head and anchor. If any step fails it **reports failure and does
+  not advance the chain**; `CaseWorkspace` operations surface that failure.
 - Tests: `test_auditlog` (append/verify, reload, in-place tamper→load fails,
-  mid-log deletion→load fails, append-failure-does-not-advance).
+  mid-log deletion→load fails, tail-truncation→load fails via anchor,
+  whole-log-deletion→load fails via anchor, anchor-stays-in-sync-across-reload,
+  append-failure-does-not-advance).
 
 ## 3. Hashcat status parsing
 
