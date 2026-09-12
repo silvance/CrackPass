@@ -1,58 +1,109 @@
-# hashcat-gui
-A graphical user interface for the password recovery utility [hashcat](https://github.com/hashcat/hashcat/).
+# CrackPass
 
-![hashcat-gui](/screenshot.png)
+CrackPass is an **offline, examiner-friendly password-recovery application for
+authorized digital-forensics work**. It provides a case-centric forensic
+workflow — evidence intake with integrity hashing, hash extraction from
+encrypted files/containers, guided attack planning, monitored cracking, a
+tamper-evident audit trail, and examiner reports — on top of established
+engines: [**hashcat**](https://github.com/hashcat/hashcat/) for cracking and the
+**John the Ripper Jumbo** `*2john` utilities for hash extraction.
 
-## Current status
-[![CI Build](https://github.com/rgroesslinger/hashcat-gui/actions/workflows/ci.yaml/badge.svg)](https://github.com/rgroesslinger/hashcat-gui/actions/workflows/ci.yaml)
-[![build result](https://build.opensuse.org/projects/home:rgroesslinger/packages/hashcat-gui/badge.svg?type=default)](https://build.opensuse.org/package/show/home:rgroesslinger/hashcat-gui)
+CrackPass runs fully offline with **no cloud dependencies**.
 
-✅ Compatible with hashcat v7.1.2
+## Built on hashcat-gui
 
-## Installation
+CrackPass began as, and still contains, a fork of the excellent
+[**hashcat-gui** by Rainer Größlinger (`rgroesslinger/hashcat-gui`)](https://github.com/rgroesslinger/hashcat-gui).
+That project is preserved intact as **Advanced Hashcat Mode** — the full
+low-level hashcat interface — and CrackPass adds a **Forensic / Guided Mode**
+alongside it. The fork stays close to upstream so improvements there can be
+merged in; the forensic layer lives in new modules (`src/forensic/`) rather than
+rewrites of the original UI.
 
-### Linux
-Packages for openSUSE, Fedora, Debian and Ubuntu are hosted on the [openSUSE Build Service (OBS)](https://build.opensuse.org/package/show/home:rgroesslinger/hashcat-gui). You have the option to download the package directly or configure your package manager to automatically receive updates for future releases by adding the OBS repository. Instructions on how to add the repository can be found on the [download page](https://software.opensuse.org/download.html?project=home:rgroesslinger&package=hashcat-gui). You can verify the fingerprint of the OpenPGP key used for signing these packages on the [Signing keys page](https://build.opensuse.org/projects/home:rgroesslinger/signing_keys).
+Full credit for the underlying GUI goes to the upstream project and its authors.
 
-### Windows
-Windows packages are available from the [release page](https://github.com/rgroesslinger/hashcat-gui/releases/).
+## Two workflows
+
+- **Forensic / Guided Mode** — create/open a case, add an artifact (referenced
+  or imported as an immutable working copy), detect its type, extract a hash,
+  plan an attack from case knowledge, run and monitor it, and produce a report.
+- **Advanced Hashcat Mode** — the original hashcat-gui, unchanged, for full
+  manual control. Nothing about hashcat is hidden; the guided mode always shows
+  the exact hashcat command before anything runs.
+
+## Status & scope
+
+- Supported extraction formats (initial set): Microsoft Office, PDF, ZIP, RAR,
+  7-Zip, KeePass.
+- ✅ Compatible with hashcat v7.x.
+- CrackPass orchestrates external tools; it does **not** bundle or replace
+  hashcat or John the Ripper. See `docs/DEPLOYMENT.md` for how to provide them.
+
+## Documentation
+
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — deploying on a disconnected Windows
+  forensic workstation; locating/bundling hashcat, the `*2john` tools, runtime
+  libraries, rules and wordlists.
+- [`docs/FORENSIC_VALIDATION.md`](docs/FORENSIC_VALIDATION.md) — the correctness
+  and integrity invariants CrackPass enforces.
+- [`docs/INTEGRATION_TESTING.md`](docs/INTEGRATION_TESTING.md) — the optional
+  real-tool integration tests and diagnostic runner.
+- [`docs/THIRD_PARTY.md`](docs/THIRD_PARTY.md) — third-party components and their
+  licenses.
+- [`docs/PASSWARE_GAP_ANALYSIS.md`](docs/PASSWARE_GAP_ANALYSIS.md) — capability
+  comparison with Passware Kit Forensic.
+
+## Configuring tools (offline)
+
+Use **Forensic Mode → Settings** to set the hashcat path, each extraction tool,
+a common-passwords wordlist, a rules directory and the default case location —
+no hidden configuration files. **Forensic Mode → Tool Status** ("Dependency
+Doctor") shows what was detected, versions, GPU/backend information and a
+hashcat self-test.
+
+CrackPass also auto-discovers a bundled **portable layout** next to the
+executable, with manual overrides always available:
+
+```
+CrackPass/
+  CrackPass(.exe)
+  tools/
+    hashcat/     # hashcat + backends
+    john/        # John the Ripper Jumbo *2john utilities
+    rules/       # default hashcat rules
+    wordlists/   # approved wordlists
+```
 
 ## Build from source
-```
-git clone https://github.com/rgroesslinger/hashcat-gui
-```
-or download latest [source release](https://github.com/rgroesslinger/hashcat-gui/releases/). If you have a working development environment with Qt Creator you can open `CMakeLists.txt` and `Build ➔ Run`.
+
+Requires CMake ≥ 3.24 and Qt 6 (Core, Gui, Widgets, Concurrent, Test).
 
 ### Linux
-- Install dependencies
-
-| Distribution | Package installation command |
-| - | ----- |
+| Distribution | Dependencies |
+| - | - |
 | Debian/Ubuntu | `apt install build-essential cmake qt6-base-dev` |
 | Fedora | `dnf install gcc-c++ cmake qt6-qtbase-devel` |
 | openSUSE | `zypper install gcc-c++ cmake qt6-base-devel` |
 | Arch | `pacman -S --needed gcc cmake qt6-base` |
 
-- Build
 ```
-cd hashcat-gui/
 cmake -B build
 cmake --build build
+ctest --test-dir build        # unit tests (offline; real-tool tests skip cleanly)
 ```
 
 ### Windows
-- Install [MSYS2](https://www.msys2.org/) and launch the `MSYS2 UCRT64` terminal
-
-- Install dependencies
+Install [MSYS2](https://www.msys2.org/), launch the `MSYS2 UCRT64` terminal, then:
 ```
 pacman -S mingw-w64-ucrt-x86_64-{gcc,cmake,qt6-base}
-```
-
-- Build
-```
-cd hashcat-gui/
 cmake -B build
 cmake --build build
 ```
 
-To launch `hashcat-gui.exe` from outside the MSYS2 terminal you need to add `C:\msys64\ucrt64\bin` to your PATH.
+## License
+
+CrackPass is licensed **GPL-3.0-or-later** (see [`LICENSE`](LICENSE)), consistent
+with the upstream hashcat-gui project. Third-party components and their licenses
+are inventoried in [`docs/THIRD_PARTY.md`](docs/THIRD_PARTY.md). hashcat and the
+John the Ripper Jumbo utilities are separate projects with their own licenses and
+are not redistributed by CrackPass by default.

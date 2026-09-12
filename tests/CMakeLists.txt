@@ -23,6 +23,7 @@ set(FORENSIC_TESTS
     test_evidenceintegrity
     test_statusstream
     test_crackedplain
+    test_dependencyprobe
 )
 
 foreach(test_name ${FORENSIC_TESTS})
