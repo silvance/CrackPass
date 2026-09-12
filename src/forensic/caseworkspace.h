@@ -120,12 +120,13 @@ public:
 
 private:
     CaseWorkspace() = default;
+    // Actor recorded on audit events (examiner name, or "system" when unset).
+    QString auditActor() const;
     bool appendAudit(const QString &action, const QString &entityType,
                      const QString &entityId, const QJsonObject &details, QString *error = nullptr);
-    bool writeCaseManifest(QString *error) const;
     bool loadEvidence(QString *error);
-    bool persistEvidence(const EvidenceItem &item, QString *error) const;
-    bool persistExtraction(const Extraction &e, QString *error) const;
+    QString evidenceMetaPath(const QUuid &evidenceId) const;
+    QString extractionMetaPath(const QUuid &extractionId) const;
     bool loadExtractions(QString *error);
     bool loadJobs(QString *error);
     bool loadCredentials(QString *error);

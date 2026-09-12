@@ -33,6 +33,8 @@ private slots:
     void addEvidenceDoesNotModifySource();
     void reopenPersistsEvidenceAndAudit();
     void auditChainRecordsActions();
+    void probeEncryptionUsesWorkingCopyWhenOriginalGone();
+    void mutationRefusesAndLeavesNoStateWhenAuditFails();
 };
 
 void TestCaseWorkspace::createScaffoldsDirsAndManifest()
@@ -112,6 +114,60 @@ void TestCaseWorkspace::auditChainRecordsActions()
     QCOMPARE(events.at(0).action, QStringLiteral("case_created"));
     QCOMPARE(events.at(1).action, QStringLiteral("evidence_added"));
     QVERIFY(ws->audit().verify());
+}
+
+void TestCaseWorkspace::probeEncryptionUsesWorkingCopyWhenOriginalGone()
+{
+    // With a working-copy import the case must analyze its own immutable copy,
+    // not the original path. Deleting the source proves the probe reads the
+    // working copy rather than depending on originalPath.
+    QTemporaryDir dir, src;
+    auto ws = CaseWorkspace::create(dir.path(), CaseInfo{});
+    QVERIFY(ws);
+
+    const QString pdf = src.filePath("enc.pdf");
+    { QFile f(pdf); f.open(QIODevice::WriteOnly);
+      f.write("%PDF-1.6\n... /Encrypt 12 0 R ... trailer"); f.close(); }
+
+    auto r = ws->addEvidence(pdf, forensic::EvidenceStorageMode::WorkingCopy);
+    QVERIFY2(r.ok, qPrintable(r.error));
+
+    // Remove the original source; only the working copy remains.
+    QVERIFY(QFile::remove(pdf));
+
+    QCOMPARE(ws->probeEncryption(r.item.id), forensic::EncryptionState::Encrypted);
+}
+
+void TestCaseWorkspace::mutationRefusesAndLeavesNoStateWhenAuditFails()
+{
+    // A mutation whose audit entry cannot be committed must be refused whole:
+    // no in-memory state, and no orphaned metadata file on disk.
+    QTemporaryDir dir, src;
+    auto ws = CaseWorkspace::create(dir.path(), CaseInfo{});
+    QVERIFY(ws);
+
+    // Sabotage the audit log so append() fails deterministically (even as root):
+    // replace the log file with a directory, which cannot be opened for writing.
+    const QString auditPath = ws->audit().filePath();
+    QVERIFY(QFile::remove(auditPath));
+    QVERIFY(QDir().mkpath(auditPath));
+
+    const int before = ws->evidence().size();
+    auto r = ws->addEvidence(makePdf(src));
+    QVERIFY(!r.ok);                              // refused
+    QVERIFY(!r.error.isEmpty());
+    QCOMPARE(ws->evidence().size(), before);     // no phantom in-memory state
+
+    // And the metadata write was rolled back: reopening (after restoring a
+    // valid audit log) shows no evidence persisted.
+    QDir(auditPath).removeRecursively();
+    { QFile f(auditPath); f.open(QIODevice::WriteOnly); f.close(); } // empty valid log
+    const QString root = ws->rootPath();
+    ws.reset();
+    QString err;
+    auto reopened = CaseWorkspace::open(root, &err);
+    QVERIFY2(reopened != nullptr, qPrintable(err));
+    QCOMPARE(reopened->evidence().size(), 0);
 }
 
 QTEST_GUILESS_MAIN(TestCaseWorkspace)

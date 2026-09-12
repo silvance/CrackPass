@@ -20,6 +20,7 @@ private slots:
     void reloadPreservesChain();
     void tamperingIsDetected();
     void deletionIsDetected();
+    void tailTruncationNotYetDetectedByChainAlone();
     void appendFailureDoesNotAdvanceChain();
 };
 
@@ -108,6 +109,36 @@ void TestAuditLog::deletionIsDetected()
     QVERIFY(!reloaded.load());
 }
 
+
+void TestAuditLog::tailTruncationNotYetDetectedByChainAlone()
+{
+    // Characterizes a KNOWN LIMITATION: dropping entries from the END of the log
+    // leaves a shorter but internally consistent chain, so chain verification
+    // alone cannot detect it. This documents the gap that the planned external
+    // head-hash + event-count anchor will close; when that anchor lands this
+    // expectation must flip to load() FAILING.
+    QTemporaryDir dir;
+    const QString path = dir.filePath("audit.jsonl");
+    {
+        AuditLog log(path);
+        log.append("examiner", "case_created", "case", "c1", {});
+        log.append("examiner", "e2", "x", "id2", {});
+        log.append("examiner", "e3", "x", "id3", {});
+    }
+    // Keep only the first two events (drop the trailing one).
+    QFile f(path);
+    QVERIFY(f.open(QIODevice::ReadOnly));
+    const QList<QByteArray> lines = f.readAll().split('\n');
+    f.close();
+    QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    f.write(lines.at(0)); f.write("\n");
+    f.write(lines.at(1)); f.write("\n");
+    f.close();
+
+    AuditLog reloaded(path);
+    QVERIFY(reloaded.load());            // NOT detected by chain alone (known gap)
+    QCOMPARE(reloaded.events().size(), 2);
+}
 
 void TestAuditLog::appendFailureDoesNotAdvanceChain()
 {

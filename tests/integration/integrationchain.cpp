@@ -73,12 +73,16 @@ QString crackOnce(const IntegrationEnv &env, CaseWorkspace &ws, const EvidenceIt
     paths.restorePath = QDir(jobDir).filePath(QStringLiteral("session.restore"));
 
     QString recovered;
+    CrackingJob finalJob = job;
     QEventLoop loop;
     QObject::connect(&queue, &JobQueue::credentialRecovered, &loop,
                      [&](const RecoveredCredential &c) { recovered = c.plaintext; loop.quit(); });
     QObject::connect(&queue, &JobQueue::jobChanged, &loop, [&](const CrackingJob &j) {
-        if (j.id == job.id && (j.state == JobState::Exhausted || j.state == JobState::Failed
-                               || j.state == JobState::Stopped))
+        if (j.id != job.id)
+            return;
+        finalJob = j; // keep the latest state/timing/devices the queue recorded
+        if (j.state == JobState::Exhausted || j.state == JobState::Failed
+            || j.state == JobState::Stopped || j.state == JobState::Recovered)
             loop.quit();
     });
     QTimer::singleShot(timeoutMs, &loop, [&] { loop.quit(); });
@@ -86,7 +90,9 @@ QString crackOnce(const IntegrationEnv &env, CaseWorkspace &ws, const EvidenceIt
     queue.enqueue(job, paths);
     loop.exec();
 
-    // Persist whatever the queue recorded so case association is real.
+    // Persist the job so it is part of the case state (reporting reads
+    // ws.jobs()) and case association is real.
+    ws.saveJob(finalJob);
     if (!recovered.isEmpty()) {
         RecoveredCredential c;
         c.caseId = ws.info().id;
@@ -196,6 +202,7 @@ ChainResult runChain(const IntegrationEnv &env, const QString &caseParentDir,
     if (!integ.ok) { r.message = QStringLiteral("evidence SHA-256 changed during processing"); return r; }
 
     r.stage = QStringLiteral("report");
+    if (ws->jobs().isEmpty()) { r.message = QStringLiteral("no job persisted for reporting"); return r; }
     const auto rep = forensic::ReportBuilder::build(*ws, ws->jobs().last(), QStringLiteral("itest"));
     const QString html = forensic::ReportRenderer::toHtml(rep);
     r.reportWritten = html.contains(item.sha256) && !forensic::ReportRenderer::toJson(rep).isEmpty();

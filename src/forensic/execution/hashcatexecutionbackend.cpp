@@ -48,6 +48,11 @@ QStringList HashcatExecutionBackend::composeArgs(const CrackingJob &job, const S
     return args;
 }
 
+QString HashcatExecutionBackend::programFor(const CrackingJob &job, const QString &configured)
+{
+    return job.hashcatPath.isEmpty() ? configured : job.hashcatPath;
+}
+
 void HashcatExecutionBackend::launch(const QUuid &jobId, bool restore)
 {
     Context *ctx = m_contexts.value(jobId);
@@ -60,7 +65,10 @@ void HashcatExecutionBackend::launch(const QUuid &jobId, bool restore)
     ctx->proc = proc;
     if (!ctx->opts.workingDir.isEmpty())
         proc->setWorkingDirectory(ctx->opts.workingDir);
-    proc->setProgram(m_program);
+    // Execute the binary recorded on the job so the process we run is exactly the
+    // one the forensic record attributes the work to. m_program is only a
+    // fallback for jobs created without a recorded path.
+    proc->setProgram(programFor(ctx->job, m_program));
     proc->setArguments(composeArgs(ctx->job, ctx->opts));
 
     connect(proc, &QProcess::readyReadStandardOutput, this, [this, jobId] { drainStatus(jobId); });

@@ -6,6 +6,7 @@ set(FORENSIC_TESTS
     test_artifactanalyzer
     test_extractorregistry
     test_auditlog
+    test_casetransaction
     test_caseworkspace
     test_datamodels
     test_moderesolution
