@@ -92,6 +92,8 @@ add_library(forensic_core STATIC
     src/forensic/atomicwrite.h
     src/forensic/deps/dependencyprobe.h
     src/forensic/deps/dependencyprobe.cpp
+    src/forensic/deps/toolchainservice.h
+    src/forensic/deps/toolchainservice.cpp
     src/forensic/evidenceitem.h
     src/forensic/evidenceitem.cpp
     src/forensic/evidenceintake.h

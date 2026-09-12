@@ -25,6 +25,7 @@ set(FORENSIC_TESTS
     test_statusstream
     test_crackedplain
     test_dependencyprobe
+    test_toolchainservice
 )
 
 foreach(test_name ${FORENSIC_TESTS})

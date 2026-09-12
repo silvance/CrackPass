@@ -5,6 +5,7 @@
 #include "dependencydoctordialog.h"
 
 #include "forensic/deps/dependencyprobe.h"
+#include "forensic/deps/toolchainservice.h"
 #include "forensic/extraction/processrunner.h"
 #include "settingsmanager.h"
 
@@ -16,7 +17,6 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
-using forensic::DependencyProbe;
 using forensic::DependencyReport;
 using forensic::ToolStatus;
 
@@ -62,10 +62,10 @@ void DependencyDoctorDialog::rescan()
 
     forensic::QtProcessRunner runner;
     auto settings = [](const QString &k) { return SettingsManager::instance().getKey<QString>(k); };
-    DependencyProbe probe(&runner, QApplication::applicationDirPath(), settings);
+    forensic::ToolchainService toolchain(&runner, QApplication::applicationDirPath(), settings);
 
     QApplication::setOverrideCursor(Qt::WaitCursor);
-    const DependencyReport rep = probe.run();
+    const DependencyReport rep = toolchain.report();
     QApplication::restoreOverrideCursor();
 
     // hashcat
