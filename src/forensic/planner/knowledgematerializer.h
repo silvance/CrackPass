@@ -7,6 +7,7 @@
 
 #include "attackjobspec.h"
 #include "caseknowledge.h"
+#include <QHash>
 #include <QString>
 #include <QStringList>
 
@@ -57,6 +58,12 @@ public:
 
     // Escapes a literal string for use inside a hashcat mask ('?' -> '??').
     static QString escapeMaskLiteral(const QString &literal);
+
+    // Parses an examiner "position:char" specification (0-based, absolute over
+    // the whole password) into a knownPositions map. Accepts pairs separated by
+    // comma/semicolon/whitespace, e.g. "0:P, 3:!, 5:a". Malformed pairs and
+    // out-of-range/duplicate positions are ignored (last wins).
+    static QHash<int, QChar> parseKnownPositions(const QString &spec);
 };
 
 } // namespace forensic

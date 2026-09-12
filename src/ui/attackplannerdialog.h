@@ -50,6 +50,7 @@ private:
     QSpinBox *m_maxLen = nullptr;
     QLineEdit *m_prefix = nullptr;
     QLineEdit *m_suffix = nullptr;
+    QLineEdit *m_knownPositions = nullptr;
     QLineEdit *m_baseWords = nullptr;
     QLineEdit *m_names = nullptr;
     QLineEdit *m_usernames = nullptr;

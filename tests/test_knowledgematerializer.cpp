@@ -21,6 +21,7 @@ private slots:
     void rulesContainYearsAndCasing();
     void maskKeyspaceMath();
     void keyspaceForStraightAndHybrid();
+    void parseKnownPositionsSpec();
 };
 
 void TestKnowledgeMaterializer::seedWordsDedupAndEmail()
@@ -99,6 +100,25 @@ void TestKnowledgeMaterializer::keyspaceForStraightAndHybrid()
 
     AttackJobSpec hybrid; hybrid.attackMode = 6; hybrid.wordlists = {wl}; hybrid.mask = "?d?d";
     QCOMPARE(KnowledgeMaterializer::estimateKeyspace(hybrid), qint64(3 * 100));
+}
+
+
+void TestKnowledgeMaterializer::parseKnownPositionsSpec()
+{
+    const auto m = KnowledgeMaterializer::parseKnownPositions("0:P, 3:!, 5:a");
+    QCOMPARE(m.size(), 3);
+    QCOMPARE(m.value(0), QChar('P'));
+    QCOMPARE(m.value(3), QChar('!'));
+    QCOMPARE(m.value(5), QChar('a'));
+
+    // Whitespace/semicolon separators and malformed pairs are handled.
+    const auto m2 = KnowledgeMaterializer::parseKnownPositions("1:x ; 2:yy ; bad ; 3:z");
+    QCOMPARE(m2.value(1), QChar('x'));
+    QVERIFY(!m2.contains(2)); // "yy" is not a single character
+    QVERIFY(!m2.contains(-1));
+    QCOMPARE(m2.value(3), QChar('z'));
+
+    QVERIFY(KnowledgeMaterializer::parseKnownPositions("").isEmpty());
 }
 
 QTEST_GUILESS_MAIN(TestKnowledgeMaterializer)

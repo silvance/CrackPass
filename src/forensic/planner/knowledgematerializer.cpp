@@ -5,6 +5,7 @@
 #include "knowledgematerializer.h"
 
 #include <QFile>
+#include <QRegularExpression>
 #include <QSet>
 #include <QTextStream>
 
@@ -327,6 +328,25 @@ qint64 KnowledgeMaterializer::estimateKeyspace(const AttackJobSpec &spec)
     default:
         return -1;
     }
+}
+
+
+QHash<int, QChar> KnowledgeMaterializer::parseKnownPositions(const QString &spec)
+{
+    QHash<int, QChar> out;
+    const QStringList pairs = spec.split(QRegularExpression(QStringLiteral("[,;\\s]+")), Qt::SkipEmptyParts);
+    for (const QString &pair : pairs) {
+        const int colon = pair.indexOf(QLatin1Char(':'));
+        if (colon <= 0 || colon + 1 >= pair.size())
+            continue; // need "<pos>:<char>" with a single trailing character
+        bool ok = false;
+        const int pos = pair.left(colon).toInt(&ok);
+        const QString value = pair.mid(colon + 1);
+        if (!ok || pos < 0 || value.size() != 1)
+            continue;
+        out.insert(pos, value.at(0));
+    }
+    return out;
 }
 
 } // namespace forensic
