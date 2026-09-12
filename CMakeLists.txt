@@ -110,6 +110,8 @@ add_library(forensic_core STATIC
     src/forensic/auditlog.cpp
     src/forensic/casetransaction.h
     src/forensic/casetransaction.cpp
+    src/forensic/recovery/recoverycontroller.h
+    src/forensic/recovery/recoverycontroller.cpp
 )
 target_include_directories(forensic_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(forensic_core PUBLIC Qt6::Core)

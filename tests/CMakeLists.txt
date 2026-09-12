@@ -26,6 +26,7 @@ set(FORENSIC_TESTS
     test_crackedplain
     test_dependencyprobe
     test_toolchainservice
+    test_recoverycontroller
 )
 
 foreach(test_name ${FORENSIC_TESTS})

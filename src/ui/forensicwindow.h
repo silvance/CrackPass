@@ -18,6 +18,7 @@ namespace forensic {
 class CaseWorkspace;
 class JobQueue;
 class JobExecutionBackend;
+class RecoveryController;
 struct CrackingJob;
 struct RecoveredCredential;
 struct HashcatStatus;
@@ -75,6 +76,7 @@ private:
     std::unique_ptr<forensic::CaseWorkspace> m_workspace;
     forensic::JobExecutionBackend *m_backend = nullptr;
     forensic::JobQueue *m_queue = nullptr;
+    forensic::RecoveryController *m_recovery = nullptr;
 
     QLabel *m_caseLabel = nullptr;
     QPushButton *m_addButton = nullptr;

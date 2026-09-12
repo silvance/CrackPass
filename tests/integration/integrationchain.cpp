@@ -9,6 +9,7 @@
 #include "forensic/extraction/toolresolver.h"
 #include "forensic/execution/hashcatexecutionbackend.h"
 #include "forensic/execution/jobqueue.h"
+#include "forensic/recovery/recoverycontroller.h"
 #include "forensic/planner/attackcommandbuilder.h"
 #include "forensic/planner/attackjobspec.h"
 #include "forensic/report/reportbuilder.h"
@@ -45,6 +46,10 @@ QString crackOnce(const IntegrationEnv &env, CaseWorkspace &ws, const EvidenceIt
 {
     HashcatExecutionBackend backend(env.hashcat.program);
     JobQueue queue(&backend);
+    // Drive recovery through the same controller the GUI uses: it builds the
+    // job, enqueues it, and persists the job record + recovered credential.
+    RecoveryController controller(&queue);
+    controller.setWorkspace(&ws);
 
     AttackJobSpec spec;
     spec.hashMode = mode;
@@ -52,55 +57,23 @@ QString crackOnce(const IntegrationEnv &env, CaseWorkspace &ws, const EvidenceIt
     spec.hashFile = hashFile;
     spec.wordlists = {wordlist};
 
-    CrackingJob job;
-    job.id = QUuid::createUuid();
-    job.caseId = ws.info().id;
-    job.evidenceId = item.id;
-    job.hashMode = mode;
-    job.attackMode = spec.attackMode;
-    job.hashFile = hashFile;
-    job.wordlists = spec.wordlists;
-    job.hashcatPath = env.hashcat.program;
-    job.hashcatArgs = AttackCommandBuilder::buildArgs(spec);
-
-    const QString jobDir = ws.jobDir(job.id);
-    QDir().mkpath(jobDir);
-    JobQueue::JobPaths paths;
-    paths.workingDir = jobDir;
-    paths.sessionName = QStringLiteral("itest-") + job.id.toString(QUuid::WithoutBraces).left(8);
-    paths.potfilePath = QDir(jobDir).filePath(QStringLiteral("job.potfile"));
-    paths.outfilePath = QDir(jobDir).filePath(QStringLiteral("cracked.out"));
-    paths.restorePath = QDir(jobDir).filePath(QStringLiteral("session.restore"));
-
     QString recovered;
-    CrackingJob finalJob = job;
     QEventLoop loop;
+    QUuid jobId;
     QObject::connect(&queue, &JobQueue::credentialRecovered, &loop,
                      [&](const RecoveredCredential &c) { recovered = c.plaintext; loop.quit(); });
     QObject::connect(&queue, &JobQueue::jobChanged, &loop, [&](const CrackingJob &j) {
-        if (j.id != job.id)
+        if (j.id != jobId)
             return;
-        finalJob = j; // keep the latest state/timing/devices the queue recorded
         if (j.state == JobState::Exhausted || j.state == JobState::Failed
             || j.state == JobState::Stopped || j.state == JobState::Recovered)
             loop.quit();
     });
     QTimer::singleShot(timeoutMs, &loop, [&] { loop.quit(); });
 
-    queue.enqueue(job, paths);
+    jobId = controller.queueRecoveryJob(spec, item.id, env.hashcat.program);
     loop.exec();
 
-    // Persist the job so it is part of the case state (reporting reads
-    // ws.jobs()) and case association is real.
-    ws.saveJob(finalJob);
-    if (!recovered.isEmpty()) {
-        RecoveredCredential c;
-        c.caseId = ws.info().id;
-        c.jobId = job.id;
-        c.evidenceId = item.id;
-        c.plaintext = recovered;
-        ws.addRecoveredCredential(c);
-    }
     return recovered;
 }
 
