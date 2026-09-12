@@ -11,6 +11,8 @@
 #include "forensic/extraction/toolresolver.h"
 #include "forensic/extraction/extraction.h"
 #include "attackplannerdialog.h"
+#include "forensicsettingsdialog.h"
+#include "dependencydoctordialog.h"
 #include "forensic/crackingjob.h"
 #include "forensic/recoveredcredential.h"
 #include "forensic/execution/jobqueue.h"
@@ -39,6 +41,8 @@
 #include <QTableWidget>
 #include <QToolBar>
 #include <QDateTime>
+#include <QCheckBox>
+#include <QClipboard>
 #include <QDesktopServices>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -104,6 +108,9 @@ ForensicWindow::ForensicWindow(QWidget *parent)
     connect(toolbar->addAction(tr("Add Artifact...")), &QAction::triggered, this, &ForensicWindow::addArtifact);
     connect(toolbar->addAction(tr("Extract Hash")), &QAction::triggered, this, &ForensicWindow::extractSelected);
     connect(toolbar->addAction(tr("Plan Attack...")), &QAction::triggered, this, &ForensicWindow::planAttackSelected);
+    toolbar->addSeparator();
+    connect(toolbar->addAction(tr("Settings...")), &QAction::triggered, this, &ForensicWindow::openForensicSettings);
+    connect(toolbar->addAction(tr("Tool Status...")), &QAction::triggered, this, &ForensicWindow::openDependencyDoctor);
 
     auto *central = new QWidget(this);
     auto *layout = new QVBoxLayout(central);
@@ -204,6 +211,20 @@ QWidget *ForensicWindow::buildResultsTab()
     auto *w = new QWidget(this);
     auto *layout = new QVBoxLayout(w);
     layout->addWidget(new QLabel(tr("Recovered credentials in this case:"), w));
+
+    auto *ctrlRow = new QHBoxLayout;
+    auto *reveal = new QCheckBox(tr("Reveal passwords"), w);
+    connect(reveal, &QCheckBox::toggled, this, &ForensicWindow::setRevealPasswords);
+    ctrlRow->addWidget(reveal);
+    auto *copyPw = new QPushButton(tr("Copy Password"), w);
+    connect(copyPw, &QPushButton::clicked, this, &ForensicWindow::copySelectedPassword);
+    ctrlRow->addWidget(copyPw);
+    auto *copyHash = new QPushButton(tr("Copy Hash"), w);
+    connect(copyHash, &QPushButton::clicked, this, &ForensicWindow::copySelectedHash);
+    ctrlRow->addWidget(copyHash);
+    ctrlRow->addStretch();
+    layout->addLayout(ctrlRow);
+
     m_resultsTable = new QTableWidget(0, 5, w);
     m_resultsTable->setHorizontalHeaderLabels(
         {tr("Artifact"), tr("Plaintext"), tr("Hash"), tr("Recovered (UTC)"), tr("Job")});
@@ -629,8 +650,14 @@ void ForensicWindow::refreshResults()
         const auto &c = creds.at(i);
         m_resultsTable->insertRow(i);
         m_resultsTable->setItem(i, 0, new QTableWidgetItem(artifactName(c.evidenceId)));
-        m_resultsTable->setItem(i, 1, new QTableWidgetItem(c.plaintext));
-        m_resultsTable->setItem(i, 2, new QTableWidgetItem(c.hash));
+        // Plaintext is concealed by default; the actual value lives in UserRole
+        // so Reveal and Copy work without displaying it.
+        auto *pw = new QTableWidgetItem(m_revealPasswords ? c.plaintext : QStringLiteral("\u2022\u2022\u2022\u2022\u2022\u2022"));
+        pw->setData(Qt::UserRole, c.plaintext);
+        m_resultsTable->setItem(i, 1, pw);
+        auto *hash = new QTableWidgetItem(c.hash);
+        hash->setData(Qt::UserRole, c.hash);
+        m_resultsTable->setItem(i, 2, hash);
         m_resultsTable->setItem(i, 3, new QTableWidgetItem(c.recoveredUtc.toString(Qt::ISODate)));
         m_resultsTable->setItem(i, 4, new QTableWidgetItem(c.jobId.toString(QUuid::WithoutBraces).left(8)));
     }
@@ -723,3 +750,37 @@ void ForensicWindow::generateReportForSelectedJob()
         QDesktopServices::openUrl(QUrl::fromLocalFile(htmlPath));
 }
 
+
+void ForensicWindow::openForensicSettings()
+{
+    ForensicSettingsDialog dlg(this);
+    dlg.exec();
+}
+
+void ForensicWindow::openDependencyDoctor()
+{
+    DependencyDoctorDialog dlg(this);
+    dlg.exec();
+}
+
+void ForensicWindow::setRevealPasswords(bool on)
+{
+    m_revealPasswords = on;
+    refreshResults();
+}
+
+void ForensicWindow::copySelectedPassword()
+{
+    const int r = m_resultsTable->currentRow();
+    if (r < 0 || !m_resultsTable->item(r, 1))
+        return;
+    QApplication::clipboard()->setText(m_resultsTable->item(r, 1)->data(Qt::UserRole).toString());
+}
+
+void ForensicWindow::copySelectedHash()
+{
+    const int r = m_resultsTable->currentRow();
+    if (r < 0 || !m_resultsTable->item(r, 2))
+        return;
+    QApplication::clipboard()->setText(m_resultsTable->item(r, 2)->data(Qt::UserRole).toString());
+}

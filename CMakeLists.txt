@@ -90,6 +90,8 @@ add_library(forensic_core STATIC
     src/forensic/hashingservice.cpp
     src/forensic/jsonutil.h
     src/forensic/atomicwrite.h
+    src/forensic/deps/dependencyprobe.h
+    src/forensic/deps/dependencyprobe.cpp
     src/forensic/evidenceitem.h
     src/forensic/evidenceitem.cpp
     src/forensic/evidenceintake.h
@@ -129,6 +131,10 @@ add_executable(hashcat-gui WIN32
     src/ui/forensicwindow.cpp
     src/ui/attackplannerdialog.h
     src/ui/attackplannerdialog.cpp
+    src/ui/forensicsettingsdialog.h
+    src/ui/forensicsettingsdialog.cpp
+    src/ui/dependencydoctordialog.h
+    src/ui/dependencydoctordialog.cpp
     src/resources.qrc
     src/hashcat-gui.rc
     src/aboutdialog.ui
