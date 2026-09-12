@@ -20,6 +20,7 @@ private slots:
     void reloadPreservesChain();
     void tamperingIsDetected();
     void deletionIsDetected();
+    void appendFailureDoesNotAdvanceChain();
 };
 
 void TestAuditLog::appendAndVerify()
@@ -76,10 +77,10 @@ void TestAuditLog::tamperingIsDetected()
     f.write(content);
     f.close();
 
+    // load() itself must reject a tampered chain (never open as if valid).
     AuditLog reloaded(path);
-    QVERIFY(reloaded.load());
     QString error;
-    QVERIFY(!reloaded.verify(&error));
+    QVERIFY(!reloaded.load(&error));
     QVERIFY(!error.isEmpty());
 }
 
@@ -104,8 +105,19 @@ void TestAuditLog::deletionIsDetected()
     f.close();
 
     AuditLog reloaded(path);
-    QVERIFY(reloaded.load());
-    QVERIFY(!reloaded.verify());
+    QVERIFY(!reloaded.load());
+}
+
+
+void TestAuditLog::appendFailureDoesNotAdvanceChain()
+{
+    // A path under a non-existent directory cannot be opened for append.
+    AuditLog log(QStringLiteral("/no/such/dir/audit.jsonl"));
+    const bool ok = log.append("examiner", "case_created", "case", "c1", {});
+    QVERIFY(!ok);                       // reported failure
+    QVERIFY(!log.lastError().isEmpty());
+    QVERIFY(log.headHash().isEmpty());  // in-memory chain did NOT advance
+    QCOMPARE(log.events().size(), 0);
 }
 
 QTEST_GUILESS_MAIN(TestAuditLog)

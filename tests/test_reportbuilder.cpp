@@ -30,6 +30,7 @@ private:
 private slots:
     void buildsFullReportWithRecovery();
     void jsonAndHtmlContainKeyFields();
+    void redactionHidesPlaintext();
 };
 
 // Builds a case with an artifact, an extraction, a job, and a recovered
@@ -122,6 +123,25 @@ void TestReportBuilder::jsonAndHtmlContainKeyFields()
     QVERIFY(html.contains(r.artifactSha256));
     QVERIFY(html.contains("letmein"));
     QVERIFY(html.contains("-m 10500"));
+}
+
+
+void TestReportBuilder::redactionHidesPlaintext()
+{
+    QTemporaryDir caseDir, src;
+    auto ws = CaseWorkspace::create(caseDir.path(), CaseInfo{});
+    QUuid jobId;
+    seedCase(ws.get(), src, jobId);
+
+    const RecoveryReport r = ReportBuilder::build(*ws, ws->jobs().first(), "0.7.1",
+                                                  /*includePlaintext=*/false);
+    QVERIFY(r.recovered);                                  // recovery still recorded
+    QCOMPARE(r.recoveredPlaintext, QStringLiteral("[REDACTED]"));
+    const QString html = ReportRenderer::toHtml(r);
+    QVERIFY(!html.contains("letmein"));                    // plaintext not leaked
+    QVERIFY(html.contains("[REDACTED]"));
+    const QByteArray json = ReportRenderer::toJson(r);
+    QVERIFY(!json.contains("letmein"));
 }
 
 QTEST_GUILESS_MAIN(TestReportBuilder)

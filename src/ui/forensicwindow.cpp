@@ -32,6 +32,7 @@
 #include <QLineEdit>
 #include <QLocale>
 #include <QMessageBox>
+#include <QProcess>
 #include <QPushButton>
 #include <QHBoxLayout>
 #include <QTabWidget>
@@ -68,6 +69,23 @@ forensic::ToolResolver buildToolResolver()
             resolver.setTool(QString::fromLatin1(id), forensic::ResolvedTool{true, path, {}, QString()});
     }
     return resolver;
+}
+
+QString probeHashcatVersion(const QString &path)
+{
+    if (path.isEmpty())
+        return QString();
+    QProcess p;
+    p.start(path, {QStringLiteral("--version")}, QIODevice::ReadOnly);
+    if (!p.waitForStarted(3000))
+        return QString();
+    if (!p.waitForFinished(5000)) {
+        p.kill();
+        p.waitForFinished(1000);
+        return QString();
+    }
+    return QString::fromUtf8(p.readAllStandardOutput()).trimmed()
+        .split(QLatin1Char('\n')).value(0).trimmed();
 }
 
 } // namespace
@@ -416,6 +434,7 @@ void ForensicWindow::planAttackSelected()
     job.hashMode = spec.hashMode;
     job.attackMode = spec.attackMode;
     job.hashcatPath = hashcatPath;
+    job.hashcatVersion = probeHashcatVersion(hashcatPath);
     job.hashcatArgs = forensic::AttackCommandBuilder::buildArgs(spec);
     job.hashFile = spec.hashFile;
     job.wordlists = spec.wordlists;
@@ -658,8 +677,15 @@ void ForensicWindow::generateReportForSelectedJob()
     if (target.id.isNull())
         return;
 
-    const forensic::RecoveryReport rep =
-        forensic::ReportBuilder::build(*m_workspace, target, QStringLiteral(GUI_VERSION));
+    const QMessageBox::StandardButton inc = QMessageBox::question(
+        this, tr("Recovered password in report"),
+        tr("Include the recovered plaintext password in this report?\n\n"
+           "Choose No to redact it (the report still records that recovery occurred)."),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+    const bool includePlaintext = (inc == QMessageBox::Yes);
+
+    const forensic::RecoveryReport rep = forensic::ReportBuilder::build(
+        *m_workspace, target, QStringLiteral(GUI_VERSION), includePlaintext);
 
     const QString stamp = QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd-HHmmss"));
     const QString base = QStringLiteral("report-%1-%2")

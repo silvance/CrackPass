@@ -46,8 +46,28 @@ public:
     const CaseInfo &info() const { return m_info; }
     QString rootPath() const { return m_rootPath; }
 
-    // Intake + persist + audit. Never modifies the source file.
-    IntakeResult addEvidence(const QString &sourcePath);
+    // Intake + persist + audit. Never modifies the source file. With
+    // EvidenceStorageMode::WorkingCopy an immutable copy is imported into the
+    // case and used for all later reads.
+    IntakeResult addEvidence(const QString &sourcePath,
+                             EvidenceStorageMode mode = EvidenceStorageMode::Referenced);
+
+    // Absolute path CrackPass reads for this artifact (working copy if imported,
+    // else the referenced original).
+    QString evidenceReadPath(const EvidenceItem &item) const;
+
+    struct IntegrityResult {
+        bool ok = false;          // current bytes still match the intake SHA-256
+        bool checked = false;     // false => could not read the artifact at all
+        QString recordedSha256;
+        QString currentSha256;
+        QString error;
+    };
+
+    // Recomputes the artifact SHA-256 and compares it to the value recorded at
+    // intake. On mismatch or unreadable source it fails loudly (audited); it
+    // never silently continues.
+    IntegrityResult verifyEvidenceIntegrity(const QUuid &evidenceId);
     QList<EvidenceItem> evidence() const { return m_evidence; }
     EvidenceItem *evidenceById(const QUuid &id);
 
@@ -100,6 +120,8 @@ public:
 
 private:
     CaseWorkspace() = default;
+    bool appendAudit(const QString &action, const QString &entityType,
+                     const QString &entityId, const QJsonObject &details, QString *error = nullptr);
     bool writeCaseManifest(QString *error) const;
     bool loadEvidence(QString *error);
     bool persistEvidence(const EvidenceItem &item, QString *error) const;

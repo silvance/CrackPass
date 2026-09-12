@@ -96,13 +96,23 @@ bool AuditLog::load(QString *error)
         m_events.append(e);
         m_headHash = e.hash;
     }
+
+    // A modified/truncated audit log must never open as if it were valid.
+    QString verr;
+    if (!verify(&verr)) {
+        m_lastError = verr;
+        if (error) *error = QStringLiteral("Audit log integrity check failed: %1").arg(verr);
+        return false;
+    }
     return true;
 }
 
-AuditEvent AuditLog::append(const QString &actor, const QString &action,
-                            const QString &entityType, const QString &entityId,
-                            const QJsonObject &details)
+bool AuditLog::append(const QString &actor, const QString &action,
+                      const QString &entityType, const QString &entityId,
+                      const QJsonObject &details)
 {
+    m_lastError.clear();
+
     AuditEvent e;
     e.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     e.timestampUtc = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
@@ -114,17 +124,23 @@ AuditEvent AuditLog::append(const QString &actor, const QString &action,
     e.prevHash = m_headHash;
     e.hash = computeHash(m_headHash, e);
 
-    QFile file(m_filePath);
-    if (file.open(QIODevice::Append | QIODevice::Text)) {
-        const QByteArray line = QJsonDocument(e.toJson()).toJson(QJsonDocument::Compact);
-        file.write(line);
-        file.write("\n");
-        file.close();
-    }
+    const QByteArray line = QJsonDocument(e.toJson()).toJson(QJsonDocument::Compact) + '\n';
 
+    QFile file(m_filePath);
+    if (!file.open(QIODevice::Append | QIODevice::Text)) {
+        m_lastError = QStringLiteral("Cannot open audit log for append: %1").arg(file.errorString());
+        return false; // do NOT advance the in-memory chain
+    }
+    if (file.write(line) != line.size() || !file.flush()) {
+        m_lastError = QStringLiteral("Failed to write audit event: %1").arg(file.errorString());
+        return false; // do NOT advance the in-memory chain
+    }
+    file.close();
+
+    // Only now that the event is durably written do we advance the chain.
     m_events.append(e);
     m_headHash = e.hash;
-    return e;
+    return true;
 }
 
 bool AuditLog::verify(QString *error) const

@@ -7,6 +7,18 @@
 
 namespace forensic {
 
+QString evidenceStorageModeToString(EvidenceStorageMode mode)
+{
+    return mode == EvidenceStorageMode::WorkingCopy ? QStringLiteral("working-copy")
+                                                    : QStringLiteral("referenced");
+}
+
+EvidenceStorageMode evidenceStorageModeFromString(const QString &s)
+{
+    return s == QStringLiteral("working-copy") ? EvidenceStorageMode::WorkingCopy
+                                               : EvidenceStorageMode::Referenced;
+}
+
 QJsonObject EvidenceItem::toJson() const
 {
     QJsonObject typeObj;
@@ -24,6 +36,8 @@ QJsonObject EvidenceItem::toJson() const
     obj[QStringLiteral("createdUtc")] = jsonutil::fromDateTime(createdUtc);
     obj[QStringLiteral("accessedUtc")] = jsonutil::fromDateTime(accessedUtc);
     obj[QStringLiteral("sha256")] = sha256;
+    obj[QStringLiteral("storageMode")] = evidenceStorageModeToString(storageMode);
+    obj[QStringLiteral("workingCopyPath")] = workingCopyPath;
     obj[QStringLiteral("importedUtc")] = jsonutil::fromDateTime(importedUtc);
     obj[QStringLiteral("type")] = typeObj;
     obj[QStringLiteral("notes")] = notes;
@@ -42,6 +56,8 @@ EvidenceItem EvidenceItem::fromJson(const QJsonObject &obj)
     e.createdUtc = jsonutil::toDateTime(obj.value(QStringLiteral("createdUtc")).toString());
     e.accessedUtc = jsonutil::toDateTime(obj.value(QStringLiteral("accessedUtc")).toString());
     e.sha256 = obj.value(QStringLiteral("sha256")).toString();
+    e.storageMode = evidenceStorageModeFromString(obj.value(QStringLiteral("storageMode")).toString());
+    e.workingCopyPath = obj.value(QStringLiteral("workingCopyPath")).toString();
     e.importedUtc = jsonutil::toDateTime(obj.value(QStringLiteral("importedUtc")).toString());
 
     const QJsonObject typeObj = obj.value(QStringLiteral("type")).toObject();
