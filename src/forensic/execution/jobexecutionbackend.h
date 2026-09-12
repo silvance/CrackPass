@@ -46,7 +46,9 @@ public:
 signals:
     void running(const QUuid &jobId);
     void statusUpdated(const QUuid &jobId, const forensic::HashcatStatus &status);
-    void cracked(const QUuid &jobId, const QString &hash, const QString &plaintext);
+    // rawPlaintext is the exact recovered password bytes (see DecodedPlain),
+    // carried verbatim so no fidelity is lost before it reaches the case store.
+    void cracked(const QUuid &jobId, const QString &hash, const QByteArray &rawPlaintext);
     void paused(const QUuid &jobId);
     void stopped(const QUuid &jobId);
     // hashcatStatusCode is the last-seen status code (HashcatStatusCode::*), or -1.

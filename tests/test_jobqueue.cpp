@@ -24,7 +24,7 @@ public:
 
     void fireRunning(const QUuid &id) { emit running(id); }
     void fireStatus(const QUuid &id, const HashcatStatus &s) { emit statusUpdated(id, s); }
-    void fireCracked(const QUuid &id, const QString &h, const QString &p) { emit cracked(id, h, p); }
+    void fireCracked(const QUuid &id, const QString &h, const QByteArray &p) { emit cracked(id, h, p); }
     void firePaused(const QUuid &id) { emit paused(id); }
     void fireStopped(const QUuid &id) { emit stopped(id); }
     void fireFinished(const QUuid &id, int ec, int sc) { emit finished(id, ec, sc); }
@@ -74,11 +74,19 @@ void TestJobQueue::crackedRecordsCredentialImmediately()
 {
     FakeBackend backend;
     JobQueue q(&backend);
-    QSignalSpy credSpy(&q, &JobQueue::credentialRecovered);
+    int credCount = 0;
+    forensic::RecoveredCredential cred;
+    QObject::connect(&q, &JobQueue::credentialRecovered, &q,
+                     [&](const forensic::RecoveredCredential &c) { ++credCount; cred = c; });
     const QUuid id = q.enqueue(job(), {});
     backend.fireCracked(id, "$keepass$*hash", "hunter2");
-    QCOMPARE(credSpy.count(), 1);
+    QCOMPARE(credCount, 1);
     QCOMPARE(q.jobById(id).state, JobState::Recovered);
+    // The recovered credential carries the exact bytes, a display form and its
+    // encoding.
+    QCOMPARE(cred.rawPlaintext, QByteArray("hunter2"));
+    QCOMPARE(cred.plaintext, QStringLiteral("hunter2"));
+    QCOMPARE(cred.encoding, QStringLiteral("utf-8"));
 }
 
 void TestJobQueue::exhaustedThenAdvances()

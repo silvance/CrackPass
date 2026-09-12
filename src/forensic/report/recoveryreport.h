@@ -65,6 +65,7 @@ struct RecoveryReport
     // Recovered credential (if any)
     bool recovered = false;
     QString recoveredPlaintext;
+    QString recoveredEncoding; // "utf-8" or "raw" (raw => plaintext shown as $HEX[..])
     QString recoveredHash;
     QString recoveredUtc;
 

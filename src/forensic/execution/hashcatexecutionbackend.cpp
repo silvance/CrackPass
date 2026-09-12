@@ -155,9 +155,9 @@ void HashcatExecutionBackend::drainCredentials(const QUuid &jobId)
         if (text.isEmpty())
             continue;
         // Outfile is plaintext-only (format 2); decode hashcat's $HEX[] wrapping
-        // so passwords with colons, spaces or Unicode survive intact.
-        const QString plain = decodeHashcatPlain(text);
-        emit cracked(jobId, ctx->targetHash, plain);
+        // to the exact password bytes so passwords with colons, spaces, Unicode
+        // or non-UTF-8 bytes survive intact.
+        emit cracked(jobId, ctx->targetHash, decodeHashcatPlain(text).raw);
     }
     ctx->emittedCredLines = line;
 }
