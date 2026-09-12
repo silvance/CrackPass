@@ -11,6 +11,7 @@
 #include "forensic/extraction/processrunner.h"
 #include "forensic/extraction/toolresolver.h"
 #include "forensic/extraction/extraction.h"
+#include "forensic/deps/toolchainservice.h"
 #include "attackplannerdialog.h"
 #include "forensicsettingsdialog.h"
 #include "dependencydoctordialog.h"
@@ -58,22 +59,13 @@ using forensic::JobState;
 
 namespace {
 
-// Tool ids used by the built-in extractors. The examiner configures a path for
-// each in settings (fully offline; no downloads).
-const char *const kToolIds[] = {"office2john", "pdf2john", "zip2john",
-                                "rar2john", "7z2john", "keepass2john"};
-
-forensic::ToolResolver buildToolResolver()
+// A settings lookup + app dir for the toolchain service, so the Dependency
+// Doctor and hash extraction resolve tools identically (settings -> portable
+// -> PATH, with interpreter handling for .py/.pl scripts).
+forensic::ToolchainService makeToolchainService(forensic::ProcessRunner *runner)
 {
-    forensic::ToolResolver resolver;
-    auto &settings = SettingsManager::instance();
-    for (const char *id : kToolIds) {
-        const QString key = QStringLiteral("tools/") + QString::fromLatin1(id);
-        const QString path = settings.getKey<QString>(key);
-        if (!path.isEmpty())
-            resolver.setTool(QString::fromLatin1(id), forensic::ResolvedTool{true, path, {}, QString()});
-    }
-    return resolver;
+    auto settings = [](const QString &k) { return SettingsManager::instance().getKey<QString>(k); };
+    return forensic::ToolchainService(runner, QApplication::applicationDirPath(), settings);
 }
 
 QString probeHashcatVersion(const QString &path)
@@ -332,8 +324,8 @@ void ForensicWindow::extractSelected()
         return;
     }
 
-    forensic::ToolResolver tools = buildToolResolver();
     forensic::QtProcessRunner runner;
+    forensic::ToolResolver tools = makeToolchainService(&runner).extractionResolver();
     forensic::ExtractionContext ctx;
     ctx.runner = &runner;
     ctx.tools = &tools;
