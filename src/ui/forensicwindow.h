@@ -75,7 +75,8 @@ private:
 
     std::unique_ptr<forensic::CaseWorkspace> m_workspace;
     forensic::JobExecutionBackend *m_backend = nullptr;     // default engine (hashcat)
-    forensic::JobExecutionBackend *m_johnBackend = nullptr; // John the Ripper
+    forensic::JobExecutionBackend *m_johnBackend = nullptr;    // John the Ripper
+    forensic::JobExecutionBackend *m_bkcrackBackend = nullptr; // bkcrack (ZipCrypto)
     forensic::JobQueue *m_queue = nullptr;
     forensic::RecoveryController *m_recovery = nullptr;
 
