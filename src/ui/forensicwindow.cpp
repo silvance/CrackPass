@@ -19,6 +19,7 @@
 #include "forensic/recoveredcredential.h"
 #include "forensic/execution/jobqueue.h"
 #include "forensic/execution/hashcatexecutionbackend.h"
+#include "forensic/execution/johnexecutionbackend.h"
 #include "forensic/execution/hashcatstatus.h"
 #include "forensic/recovery/recoverycontroller.h"
 #include "forensic/planner/attackcommandbuilder.h"
@@ -56,6 +57,7 @@ using forensic::EvidenceItem;
 using forensic::CrackingJob;
 using forensic::JobQueue;
 using forensic::HashcatExecutionBackend;
+using forensic::JohnExecutionBackend;
 using forensic::JobState;
 
 namespace {
@@ -126,10 +128,21 @@ ForensicWindow::ForensicWindow(QWidget *parent)
     m_backend = new HashcatExecutionBackend(
         SettingsManager::instance().getKey<QString>("hashcatPath"), this);
     m_queue = new JobQueue(m_backend, this);
+    // John the Ripper is a second engine; jobs whose engineId is "john" route to
+    // this backend. The default (hashcat) backend still serves every other job.
+    m_johnBackend = new JohnExecutionBackend(
+        SettingsManager::instance().getKey<QString>("johnPath"), this);
+    m_queue->registerBackend(QStringLiteral("john"), m_johnBackend);
     // The controller owns the persistence side of recovery (job state + recovered
     // credentials -> case). Construct it before wiring the display slots so its
     // writes land before the UI reads them back.
     m_recovery = new forensic::RecoveryController(m_queue, this);
+    // Surface a refused attack (e.g. an engine that cannot express the plan) to
+    // the examiner instead of silently doing nothing.
+    connect(m_recovery, &forensic::RecoveryController::recoveryRefused, this,
+            [this](const QString &reason) {
+                QMessageBox::warning(this, tr("Queue Attack"), reason);
+            });
     connect(m_queue, &JobQueue::jobChanged, this, &ForensicWindow::onJobChanged);
     connect(m_queue, &JobQueue::jobStatus, this, &ForensicWindow::onJobStatus);
     connect(m_queue, &JobQueue::credentialRecovered, this, &ForensicWindow::onCredentialRecovered);

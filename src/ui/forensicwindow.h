@@ -74,7 +74,8 @@ private:
     QString artifactName(const QUuid &evidenceId) const;
 
     std::unique_ptr<forensic::CaseWorkspace> m_workspace;
-    forensic::JobExecutionBackend *m_backend = nullptr;
+    forensic::JobExecutionBackend *m_backend = nullptr;     // default engine (hashcat)
+    forensic::JobExecutionBackend *m_johnBackend = nullptr; // John the Ripper
     forensic::JobQueue *m_queue = nullptr;
     forensic::RecoveryController *m_recovery = nullptr;
 

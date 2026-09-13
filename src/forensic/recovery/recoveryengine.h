@@ -29,8 +29,21 @@ public:
     // Human-readable name for UI/reports.
     virtual QString displayName() const = 0;
     // The engine-specific argv for this attack (without per-job session/output
-    // plumbing, which the backend adds).
+    // plumbing, which the backend adds). Only meaningful when the engine can
+    // express the attack (unsupportedReason is empty).
     virtual QStringList buildArgs(const AttackJobSpec &spec) const = 0;
+
+    // Empty when this engine can express `spec` exactly; otherwise a
+    // human-readable reason it cannot. Engines refuse rather than approximate,
+    // so the controller can decline the job with a clear message instead of
+    // running something that does not match what was planned. The default is
+    // "supported" -- an engine (like hashcat) that expresses everything the
+    // planner produces need not override it.
+    virtual QString unsupportedReason(const AttackJobSpec &spec) const
+    {
+        Q_UNUSED(spec);
+        return QString();
+    }
 };
 
 } // namespace forensic

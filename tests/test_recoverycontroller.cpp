@@ -46,6 +46,9 @@ private slots:
     void recoveredCredentialIsPersisted();
     void noWorkspaceIsANoOp();
     void restoreJobsRehydratesPersistedJobsForResume();
+    void refusesUnknownEngine();
+    void queuesJohnWordlistJob();
+    void refusesJohnInexpressibleAttack();
 };
 
 static AttackJobSpec straightSpec()
@@ -77,7 +80,7 @@ void TestRecoveryController::queuesBuildsAndPersistsJob()
 
     // The reproducible record is persisted with the fields the controller built.
     QCOMPARE(ws->jobs().size(), 1);
-    const CrackingJob &j = ws->jobs().first();
+    const CrackingJob j = ws->jobs().first(); // by value: jobs() returns a temporary
     QCOMPARE(j.id, jobId);
     QCOMPARE(j.evidenceId, evidenceId);
     QCOMPARE(j.hashcatPath, QStringLiteral("/tools/hashcat"));
@@ -104,7 +107,7 @@ void TestRecoveryController::recoveredCredentialIsPersisted()
     backend.fireCracked(jobId, QStringLiteral("$keepass$*hash"), QByteArray("hunter2"));
 
     QCOMPARE(ws->recoveredCredentials().size(), 1);
-    const RecoveredCredential &c = ws->recoveredCredentials().first();
+    const RecoveredCredential c = ws->recoveredCredentials().first(); // by value: temporary
     QCOMPARE(c.jobId, jobId);
     QCOMPARE(c.evidenceId, evidenceId);
     QCOMPARE(c.plaintext, QStringLiteral("hunter2"));
@@ -132,7 +135,8 @@ void TestRecoveryController::restoreJobsRehydratesPersistedJobsForResume()
         auto ws = CaseWorkspace::create(dir.path(), CaseInfo{});
         QVERIFY(ws);
         root = ws->rootPath();
-        const RecoveryEngine *hc = RecoveryEngineRegistry::withBuiltins().find("hashcat");
+        const RecoveryEngineRegistry engines = RecoveryEngineRegistry::withBuiltins();
+        const RecoveryEngine *hc = engines.find("hashcat");
         QVERIFY(hc);
         CrackingJob j = RecoveryController::buildJob(*hc, straightSpec(), ws->info().id,
                                                      QUuid::createUuid(), QStringLiteral("/tools/hashcat"),
@@ -162,6 +166,79 @@ void TestRecoveryController::restoreJobsRehydratesPersistedJobsForResume()
     queue.resume(jobId);
     QCOMPARE(backend.resumed, (QList<QUuid>{jobId}));
     QVERIFY(backend.resumeRestore);
+}
+
+void TestRecoveryController::refusesUnknownEngine()
+{
+    QTemporaryDir dir;
+    auto ws = CaseWorkspace::create(dir.path(), CaseInfo{});
+    QVERIFY(ws);
+
+    FakeBackend backend;
+    JobQueue queue(&backend);
+    RecoveryController controller(&queue);
+    controller.setWorkspace(ws.get());
+
+    QSignalSpy refused(&controller, &RecoveryController::recoveryRefused);
+    const QUuid jobId = controller.queueRecoveryJob(straightSpec(), QUuid::createUuid(),
+                                                    QStringLiteral("/tools/x"), QString(),
+                                                    QStringLiteral("nope"));
+    QVERIFY(jobId.isNull());
+    QCOMPARE(refused.size(), 1);
+    QVERIFY(backend.started.isEmpty());
+    QVERIFY(ws->jobs().isEmpty());
+}
+
+void TestRecoveryController::queuesJohnWordlistJob()
+{
+    QTemporaryDir dir;
+    auto ws = CaseWorkspace::create(dir.path(), CaseInfo{});
+    QVERIFY(ws);
+
+    FakeBackend backend;
+    JobQueue queue(&backend);
+    RecoveryController controller(&queue);
+    controller.setWorkspace(ws.get());
+
+    // A clean wordlist attack is expressible by John and is queued as a "john" job.
+    const QUuid jobId = controller.queueRecoveryJob(straightSpec(), QUuid::createUuid(),
+                                                    QStringLiteral("/tools/john"),
+                                                    QStringLiteral("1.9.0-jumbo"),
+                                                    QStringLiteral("john"));
+    QVERIFY(!jobId.isNull());
+    QCOMPARE(ws->jobs().size(), 1);
+    const CrackingJob j = ws->jobs().first(); // by value: jobs() returns a temporary
+    QCOMPARE(j.engineId, QStringLiteral("john"));
+    QVERIFY(j.hashcatArgs.contains(QStringLiteral("--wordlist=wl.txt")));
+}
+
+void TestRecoveryController::refusesJohnInexpressibleAttack()
+{
+    QTemporaryDir dir;
+    auto ws = CaseWorkspace::create(dir.path(), CaseInfo{});
+    QVERIFY(ws);
+
+    FakeBackend backend;
+    JobQueue queue(&backend);
+    RecoveryController controller(&queue);
+    controller.setWorkspace(ws.get());
+
+    // A rule-file attack cannot be expressed by John: refuse, do not approximate.
+    AttackJobSpec spec = straightSpec();
+    spec.rules = {QStringLiteral("best64.rule")};
+
+    QSignalSpy refused(&controller, &RecoveryController::recoveryRefused);
+    const QUuid jobId = controller.queueRecoveryJob(spec, QUuid::createUuid(),
+                                                    QStringLiteral("/tools/john"), QString(),
+                                                    QStringLiteral("john"));
+    QVERIFY(jobId.isNull());
+    QCOMPARE(refused.size(), 1);
+    QVERIFY(backend.started.isEmpty());
+    QVERIFY(ws->jobs().isEmpty());
+    // The same attack IS accepted by hashcat (the default engine).
+    const QUuid hc = controller.queueRecoveryJob(spec, QUuid::createUuid(),
+                                                 QStringLiteral("/tools/hashcat"));
+    QVERIFY(!hc.isNull());
 }
 
 QTEST_GUILESS_MAIN(TestRecoveryController)

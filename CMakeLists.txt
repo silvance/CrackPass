@@ -63,6 +63,8 @@ add_library(forensic_core STATIC
     src/forensic/planner/attackjobspec.cpp
     src/forensic/planner/attackcommandbuilder.h
     src/forensic/planner/attackcommandbuilder.cpp
+    src/forensic/planner/johncommandbuilder.h
+    src/forensic/planner/johncommandbuilder.cpp
     src/forensic/planner/knowledgematerializer.h
     src/forensic/planner/knowledgematerializer.cpp
     src/forensic/planner/attackpreview.h
@@ -80,6 +82,8 @@ add_library(forensic_core STATIC
     src/forensic/execution/jobqueue.cpp
     src/forensic/execution/hashcatexecutionbackend.h
     src/forensic/execution/hashcatexecutionbackend.cpp
+    src/forensic/execution/johnexecutionbackend.h
+    src/forensic/execution/johnexecutionbackend.cpp
     src/forensic/report/recoveryreport.h
     src/forensic/report/recoveryreport.cpp
     src/forensic/report/reportbuilder.h
