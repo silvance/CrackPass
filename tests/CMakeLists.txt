@@ -11,6 +11,7 @@ set(FORENSIC_TESTS
     test_datamodels
     test_moderesolution
     test_encryptionprobe
+    test_zipcipher
     test_johnextractors
     test_extractionservice
     test_attackcommandbuilder
