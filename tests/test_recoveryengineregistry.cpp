@@ -25,6 +25,8 @@ private slots:
     void builtinsHaveHashcatAsDefault();
     void findReturnsNullForUnknown();
     void registerAndBuildArgsDispatch();
+    void johnIsBuiltInAndReportsUnsupported();
+    void hashcatSupportsEverythingByDefault();
 };
 
 void TestRecoveryEngineRegistry::builtinsHaveHashcatAsDefault()
@@ -57,6 +59,41 @@ void TestRecoveryEngineRegistry::registerAndBuildArgsDispatch()
     QVERIFY(fake != nullptr);
     QCOMPARE(fake->buildArgs(AttackJobSpec{}), (QStringList{QStringLiteral("--fake")}));
     QVERIFY(reg.engines().size() >= 2); // hashcat + fake
+}
+
+void TestRecoveryEngineRegistry::johnIsBuiltInAndReportsUnsupported()
+{
+    const RecoveryEngineRegistry reg = RecoveryEngineRegistry::withBuiltins();
+    const RecoveryEngine *john = reg.find(QStringLiteral("john"));
+    QVERIFY(john != nullptr);
+    QCOMPARE(john->id(), QStringLiteral("john"));
+
+    // A clean wordlist attack is expressible.
+    AttackJobSpec ok;
+    ok.attackMode = AttackModeNum::Straight;
+    ok.hashFile = QStringLiteral("h.txt");
+    ok.wordlists = {QStringLiteral("wl.txt")};
+    QVERIFY(john->unsupportedReason(ok).isEmpty());
+    QVERIFY(!john->buildArgs(ok).isEmpty());
+
+    // A rule-file attack is not: John refuses it with a reason.
+    AttackJobSpec ruled = ok;
+    ruled.rules = {QStringLiteral("best64.rule")};
+    QVERIFY(!john->unsupportedReason(ruled).isEmpty());
+}
+
+void TestRecoveryEngineRegistry::hashcatSupportsEverythingByDefault()
+{
+    const RecoveryEngineRegistry reg = RecoveryEngineRegistry::withBuiltins();
+    const RecoveryEngine *hc = reg.find(QStringLiteral("hashcat"));
+    QVERIFY(hc != nullptr);
+    // hashcat expresses everything the planner produces (default seam behaviour).
+    AttackJobSpec ruled;
+    ruled.attackMode = AttackModeNum::Straight;
+    ruled.hashFile = QStringLiteral("h.txt");
+    ruled.wordlists = {QStringLiteral("wl.txt")};
+    ruled.rules = {QStringLiteral("best64.rule")};
+    QVERIFY(hc->unsupportedReason(ruled).isEmpty());
 }
 
 QTEST_GUILESS_MAIN(TestRecoveryEngineRegistry)

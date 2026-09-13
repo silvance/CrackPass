@@ -45,10 +45,13 @@ public:
     const RecoveryEngineRegistry &engines() const { return m_engines; }
 
     // Build the reproducible job from a planned spec, enqueue it, and return its
-    // id (null if no workspace is set, or the engineId is unknown). `engineId`
-    // selects the recovery engine (default hashcat); `toolPath`/`toolVersion`
-    // record the resolved binary for provenance. As the queue runs the job,
-    // state transitions and any recovered credential are written to the case.
+    // id. Returns a null id -- and emits recoveryRefused with the reason -- when
+    // no workspace is set, the engineId is unknown, or the chosen engine cannot
+    // express the attack exactly (it is refused rather than approximated).
+    // `engineId` selects the recovery engine (default hashcat);
+    // `toolPath`/`toolVersion` record the resolved binary for provenance. As the
+    // queue runs the job, state transitions and any recovered credential are
+    // written to the case.
     QUuid queueRecoveryJob(const AttackJobSpec &spec, const QUuid &evidenceId,
                            const QString &toolPath, const QString &toolVersion = QString(),
                            const QString &engineId = RecoveryEngineRegistry::defaultEngineId());
@@ -63,6 +66,12 @@ public:
                                 const QString &caseId, const QUuid &evidenceId,
                                 const QString &toolPath, const QString &toolVersion);
     static JobQueue::JobPaths buildPaths(const QString &jobDir, const QUuid &jobId);
+
+signals:
+    // Emitted when queueRecoveryJob declines to queue an attack, with a
+    // human-readable reason (unknown engine, or an engine that cannot express
+    // the planned attack). The UI shows this to the examiner.
+    void recoveryRefused(const QString &reason);
 
 private:
     JobQueue *m_queue;

@@ -63,11 +63,23 @@ QUuid RecoveryController::queueRecoveryJob(const AttackJobSpec &spec, const QUui
                                            const QString &toolPath, const QString &toolVersion,
                                            const QString &engineId)
 {
-    if (!m_workspace)
+    if (!m_workspace) {
+        emit recoveryRefused(tr("No case is open."));
         return QUuid();
+    }
     const RecoveryEngine *engine = m_engines.find(engineId);
-    if (!engine)
+    if (!engine) {
+        emit recoveryRefused(tr("Unknown recovery engine \"%1\".").arg(engineId));
         return QUuid(); // unknown engine: refuse rather than run the wrong tool
+    }
+    // Refuse an attack the engine cannot express exactly rather than run an
+    // approximation that would not match what the examiner planned.
+    const QString unsupported = engine->unsupportedReason(spec);
+    if (!unsupported.isEmpty()) {
+        emit recoveryRefused(tr("%1 cannot run this attack: %2")
+                                 .arg(engine->displayName(), unsupported));
+        return QUuid();
+    }
 
     const CrackingJob job = buildJob(*engine, spec, m_workspace->info().id, evidenceId,
                                      toolPath, toolVersion);
