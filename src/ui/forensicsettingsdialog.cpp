@@ -30,6 +30,7 @@ ForensicSettingsDialog::ForensicSettingsDialog(QWidget *parent)
     auto *ef = new QFormLayout(engine);
     addPathRow(ef, tr("hashcat executable"), QStringLiteral("hashcatPath"), false);
     addPathRow(ef, tr("John the Ripper executable"), QStringLiteral("johnPath"), false);
+    addPathRow(ef, tr("bkcrack executable (ZipCrypto)"), QStringLiteral("bkcrackPath"), false);
     root->addWidget(engine);
 
     auto *extractors = new QGroupBox(tr("Extraction utilities (John the Ripper Jumbo)"), this);

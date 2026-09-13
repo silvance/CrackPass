@@ -21,6 +21,8 @@
 #include "forensic/execution/hashcatexecutionbackend.h"
 #include "forensic/execution/johnexecutionbackend.h"
 #include "forensic/execution/bkcrackexecutionbackend.h"
+#include "forensic/extraction/zipcipher.h"
+#include "bkcrackdialog.h"
 #include "forensic/execution/hashcatstatus.h"
 #include "forensic/recovery/recoverycontroller.h"
 #include "forensic/planner/attackcommandbuilder.h"
@@ -115,6 +117,31 @@ QString probeJohnVersion(const QString &path)
     return lines.value(0).trimmed();
 }
 
+// bkcrack prints its version banner when run with no arguments; capture the
+// first line mentioning bkcrack. Best-effort provenance only.
+QString probeBkcrackVersion(const QString &path)
+{
+    if (path.isEmpty())
+        return QString();
+    QProcess p;
+    p.setProcessChannelMode(QProcess::MergedChannels);
+    p.start(path, {}, QIODevice::ReadOnly);
+    if (!p.waitForStarted(3000))
+        return QString();
+    if (!p.waitForFinished(5000)) {
+        p.kill();
+        p.waitForFinished(1000);
+        return QString();
+    }
+    const QStringList lines = QString::fromUtf8(p.readAll()).split(QLatin1Char('\n'));
+    for (const QString &l : lines) {
+        const QString t = l.trimmed();
+        if (t.contains(QStringLiteral("bkcrack"), Qt::CaseInsensitive))
+            return t;
+    }
+    return lines.value(0).trimmed();
+}
+
 } // namespace
 
 ForensicWindow::ForensicWindow(QWidget *parent)
@@ -199,6 +226,10 @@ QWidget *ForensicWindow::buildEvidenceTab()
     m_planButton = new QPushButton(tr("Plan Attack..."), w);
     connect(m_planButton, &QPushButton::clicked, this, &ForensicWindow::planAttackSelected);
     buttonRow->addWidget(m_planButton);
+    m_bkcrackButton = new QPushButton(tr("ZipCrypto Attack..."), w);
+    m_bkcrackButton->setToolTip(tr("Known-plaintext attack (bkcrack) on a legacy ZipCrypto archive"));
+    connect(m_bkcrackButton, &QPushButton::clicked, this, &ForensicWindow::zipCryptoAttackSelected);
+    buttonRow->addWidget(m_bkcrackButton);
     buttonRow->addStretch();
     layout->addLayout(buttonRow);
 
@@ -283,6 +314,7 @@ void ForensicWindow::setCaseActionsEnabled(bool enabled)
     m_addButton->setEnabled(enabled);
     m_extractButton->setEnabled(enabled);
     m_planButton->setEnabled(enabled);
+    m_bkcrackButton->setEnabled(enabled);
 }
 
 void ForensicWindow::newCase()
@@ -513,6 +545,53 @@ void ForensicWindow::planAttackSelected()
     // enqueues it, and persists the record + later state/credentials. It refuses
     // (via recoveryRefused) if the engine cannot express the attack.
     m_recovery->queueRecoveryJob(dlg.plannedSpec(), item.id, toolPath, toolVersion, engineId);
+    m_tabs->setCurrentIndex(1); // show the Jobs tab
+}
+
+void ForensicWindow::zipCryptoAttackSelected()
+{
+    if (!m_workspace)
+        return;
+    const int row = m_table->currentRow();
+    if (row < 0 || row >= m_workspace->evidence().size()) {
+        QMessageBox::information(this, tr("ZipCrypto Attack"), tr("Select an artifact first."));
+        return;
+    }
+    const EvidenceItem item = m_workspace->evidence().at(row);
+    const QString zipPath = m_workspace->evidenceReadPath(item);
+
+    // bkcrack applies only to legacy ZipCrypto; classify first and refuse AES /
+    // unencrypted archives with a clear pointer to the password path.
+    const forensic::ZipCipherScan scan = forensic::ZipCipherClassifier::scan(zipPath);
+    if (!scan.isZip) {
+        QMessageBox::information(this, tr("ZipCrypto Attack"),
+                                 tr("This artifact is not a ZIP archive."));
+        return;
+    }
+    if (!scan.hasZipCrypto()) {
+        const QString why = scan.hasAes()
+            ? tr("This archive uses WinZip AES encryption, which bkcrack cannot attack.")
+            : tr("This archive has no ZipCrypto-encrypted entries.");
+        QMessageBox::information(
+            this, tr("ZipCrypto Attack"),
+            why + QLatin1Char('\n')
+                + tr("Use 'Extract Hash' to recover the password with hashcat or John instead."));
+        return;
+    }
+
+    BkcrackDialog dlg(zipPath, scan.zipCryptoEntryNames(), this);
+    if (dlg.exec() != QDialog::Accepted)
+        return; // cancelled
+
+    const QString toolPath = SettingsManager::instance().getKey<QString>("bkcrackPath");
+    if (toolPath.isEmpty()) {
+        QMessageBox::warning(this, tr("ZipCrypto Attack"),
+                             tr("Configure the bkcrack path in Settings before queuing a job."));
+        return;
+    }
+    // The controller builds and persists the reproducible bkcrack job; it refuses
+    // (via recoveryRefused) if the spec cannot be turned into a command.
+    m_recovery->queueBkcrackJob(dlg.plannedSpec(), item.id, toolPath, probeBkcrackVersion(toolPath));
     m_tabs->setCurrentIndex(1); // show the Jobs tab
 }
 
