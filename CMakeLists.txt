@@ -51,6 +51,8 @@ add_library(forensic_core STATIC
     src/forensic/extraction/toolresolver.h
     src/forensic/extraction/encryptionprobe.h
     src/forensic/extraction/encryptionprobe.cpp
+    src/forensic/extraction/zipcipher.h
+    src/forensic/extraction/zipcipher.cpp
     src/forensic/extraction/john2hashextractor.h
     src/forensic/extraction/john2hashextractor.cpp
     src/forensic/extraction/johnextractors.h
