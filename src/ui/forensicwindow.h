@@ -44,6 +44,7 @@ private slots:
     void addArtifact();
     void extractSelected();
     void planAttackSelected();
+    void zipCryptoAttackSelected();
 
     void onJobChanged(const forensic::CrackingJob &job);
     void onJobStatus(const QUuid &jobId, const forensic::HashcatStatus &status);
@@ -84,6 +85,7 @@ private:
     QPushButton *m_addButton = nullptr;
     QPushButton *m_extractButton = nullptr;
     QPushButton *m_planButton = nullptr;
+    QPushButton *m_bkcrackButton = nullptr;
     QTableWidget *m_table = nullptr;
 
     QTabWidget *m_tabs = nullptr;

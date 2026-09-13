@@ -155,6 +155,8 @@ add_executable(casekey WIN32
     src/ui/forensicwindow.cpp
     src/ui/attackplannerdialog.h
     src/ui/attackplannerdialog.cpp
+    src/ui/bkcrackdialog.h
+    src/ui/bkcrackdialog.cpp
     src/ui/forensicsettingsdialog.h
     src/ui/forensicsettingsdialog.cpp
     src/ui/dependencydoctordialog.h

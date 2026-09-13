@@ -3,6 +3,7 @@
  * SPDX-FileCopyrightText: CaseKey contributors
  */
 #include "forensic/recovery/recoverycontroller.h"
+#include "forensic/bkcrack/bkcrackattackspec.h"
 #include "forensic/caseworkspace.h"
 #include "forensic/execution/jobexecutionbackend.h"
 #include "forensic/execution/jobqueue.h"
@@ -47,6 +48,8 @@ private slots:
     void noWorkspaceIsANoOp();
     void restoreJobsRehydratesPersistedJobsForResume();
     void refusesUnknownEngine();
+    void queuesBkcrackJob();
+    void refusesIncompleteBkcrackJob();
     void queuesJohnWordlistJob();
     void refusesJohnInexpressibleAttack();
 };
@@ -186,6 +189,53 @@ void TestRecoveryController::refusesUnknownEngine()
     QVERIFY(jobId.isNull());
     QCOMPARE(refused.size(), 1);
     QVERIFY(backend.started.isEmpty());
+    QVERIFY(ws->jobs().isEmpty());
+}
+
+void TestRecoveryController::queuesBkcrackJob()
+{
+    QTemporaryDir dir;
+    auto ws = CaseWorkspace::create(dir.path(), CaseInfo{});
+    QVERIFY(ws);
+
+    FakeBackend backend;
+    JobQueue queue(&backend);
+    RecoveryController controller(&queue);
+    controller.setWorkspace(ws.get());
+
+    BkcrackAttackSpec spec;
+    spec.zipPath = QStringLiteral("/case/e.zip");
+    spec.targetEntry = QStringLiteral("secret.doc");
+    spec.plainFile = QStringLiteral("/case/known.bin");
+
+    const QUuid jobId = controller.queueBkcrackJob(spec, QUuid::createUuid(),
+                                                   QStringLiteral("/tools/bkcrack"),
+                                                   QStringLiteral("bkcrack 1.7.0"));
+    QVERIFY(!jobId.isNull());
+    QCOMPARE(ws->jobs().size(), 1);
+    const CrackingJob j = ws->jobs().first();
+    QCOMPARE(j.engineId, QStringLiteral("bkcrack"));
+    QVERIFY(j.hashcatArgs.contains(QStringLiteral("-C")));
+    QVERIFY(j.hashcatArgs.contains(QStringLiteral("secret.doc")));
+}
+
+void TestRecoveryController::refusesIncompleteBkcrackJob()
+{
+    QTemporaryDir dir;
+    auto ws = CaseWorkspace::create(dir.path(), CaseInfo{});
+    QVERIFY(ws);
+
+    FakeBackend backend;
+    JobQueue queue(&backend);
+    RecoveryController controller(&queue);
+    controller.setWorkspace(ws.get());
+
+    BkcrackAttackSpec spec; // no archive/entry/plaintext
+    QSignalSpy refused(&controller, &RecoveryController::recoveryRefused);
+    const QUuid jobId = controller.queueBkcrackJob(spec, QUuid::createUuid(),
+                                                   QStringLiteral("/tools/bkcrack"));
+    QVERIFY(jobId.isNull());
+    QCOMPARE(refused.size(), 1);
     QVERIFY(ws->jobs().isEmpty());
 }
 

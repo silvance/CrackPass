@@ -18,6 +18,7 @@
 #include "forensic/crackingjob.h"
 #include "forensic/execution/jobqueue.h"
 #include "forensic/planner/attackjobspec.h"
+#include "forensic/bkcrack/bkcrackattackspec.h"
 #include "recoveryengine.h"
 #include "recoveryengineregistry.h"
 
@@ -55,6 +56,15 @@ public:
     QUuid queueRecoveryJob(const AttackJobSpec &spec, const QUuid &evidenceId,
                            const QString &toolPath, const QString &toolVersion = QString(),
                            const QString &engineId = RecoveryEngineRegistry::defaultEngineId());
+
+    // Build and enqueue a bkcrack (ZipCrypto known-plaintext) job from its own
+    // spec, returning its id. bkcrack does not fit the hashcat-shaped
+    // AttackJobSpec, so it has a dedicated path here. Returns a null id -- and
+    // emits recoveryRefused with the reason -- when no workspace is set or the
+    // spec cannot be turned into a bkcrack command (see BkcrackCommandBuilder).
+    // `toolPath`/`toolVersion` record the resolved bkcrack binary for provenance.
+    QUuid queueBkcrackJob(const BkcrackAttackSpec &spec, const QUuid &evidenceId,
+                          const QString &toolPath, const QString &toolVersion = QString());
 
     // Re-register the current case's persisted jobs into the queue (with their
     // session paths reconstructed) so they survive a reopen: resume/stop/report

@@ -5,6 +5,7 @@
 #include "recoverycontroller.h"
 
 #include "forensic/caseworkspace.h"
+#include "forensic/bkcrack/bkcrackcommandbuilder.h"
 
 #include <QDir>
 
@@ -83,6 +84,34 @@ QUuid RecoveryController::queueRecoveryJob(const AttackJobSpec &spec, const QUui
 
     const CrackingJob job = buildJob(*engine, spec, m_workspace->info().id, evidenceId,
                                      toolPath, toolVersion);
+    const QString jobDir = m_workspace->jobDir(job.id);
+    QDir().mkpath(jobDir);
+    return m_queue->enqueue(job, buildPaths(jobDir, job.id));
+}
+
+QUuid RecoveryController::queueBkcrackJob(const BkcrackAttackSpec &spec, const QUuid &evidenceId,
+                                          const QString &toolPath, const QString &toolVersion)
+{
+    if (!m_workspace) {
+        emit recoveryRefused(tr("No case is open."));
+        return QUuid();
+    }
+    const BkcrackBuildResult built = BkcrackCommandBuilder::build(spec);
+    if (!built.valid) {
+        emit recoveryRefused(tr("bkcrack cannot run this attack: %1").arg(built.error));
+        return QUuid();
+    }
+
+    CrackingJob job;
+    job.id = QUuid::createUuid();
+    job.caseId = m_workspace->info().id;
+    job.evidenceId = evidenceId;
+    job.engineId = QStringLiteral("bkcrack");
+    job.hashcatPath = toolPath;    // the resolved bkcrack binary (field name is historical)
+    job.hashcatVersion = toolVersion;
+    job.hashcatArgs = built.args;  // the bkcrack argv
+    job.hashFile = spec.zipPath;   // the archive under attack, for reference/reporting
+
     const QString jobDir = m_workspace->jobDir(job.id);
     QDir().mkpath(jobDir);
     return m_queue->enqueue(job, buildPaths(jobDir, job.id));
