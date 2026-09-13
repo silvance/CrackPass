@@ -72,6 +72,9 @@ add_library(forensic_core STATIC
     src/forensic/planner/attackpreview.h
     src/forensic/planner/attackplanner.h
     src/forensic/planner/attackplanner.cpp
+    src/forensic/bkcrack/bkcrackattackspec.h
+    src/forensic/bkcrack/bkcrackcommandbuilder.h
+    src/forensic/bkcrack/bkcrackcommandbuilder.cpp
     src/forensic/execution/hashcatstatus.h
     src/forensic/execution/hashcatstatusparser.h
     src/forensic/execution/hashcatstatusparser.cpp
