@@ -20,6 +20,7 @@
 #include "forensic/execution/jobqueue.h"
 #include "forensic/execution/hashcatexecutionbackend.h"
 #include "forensic/execution/johnexecutionbackend.h"
+#include "forensic/execution/bkcrackexecutionbackend.h"
 #include "forensic/execution/hashcatstatus.h"
 #include "forensic/recovery/recoverycontroller.h"
 #include "forensic/planner/attackcommandbuilder.h"
@@ -159,6 +160,11 @@ ForensicWindow::ForensicWindow(QWidget *parent)
     m_johnBackend = new JohnExecutionBackend(
         SettingsManager::instance().getKey<QString>("johnPath"), this);
     m_queue->registerBackend(QStringLiteral("john"), m_johnBackend);
+    // bkcrack is the ZipCrypto known-plaintext engine; jobs whose engineId is
+    // "bkcrack" route to this backend.
+    m_bkcrackBackend = new forensic::BkcrackExecutionBackend(
+        SettingsManager::instance().getKey<QString>("bkcrackPath"), this);
+    m_queue->registerBackend(QStringLiteral("bkcrack"), m_bkcrackBackend);
     // The controller owns the persistence side of recovery (job state + recovered
     // credentials -> case). Construct it before wiring the display slots so its
     // writes land before the UI reads them back.

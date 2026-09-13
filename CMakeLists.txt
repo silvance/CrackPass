@@ -89,6 +89,8 @@ add_library(forensic_core STATIC
     src/forensic/execution/hashcatexecutionbackend.cpp
     src/forensic/execution/johnexecutionbackend.h
     src/forensic/execution/johnexecutionbackend.cpp
+    src/forensic/execution/bkcrackexecutionbackend.h
+    src/forensic/execution/bkcrackexecutionbackend.cpp
     src/forensic/report/recoveryreport.h
     src/forensic/report/recoveryreport.cpp
     src/forensic/report/reportbuilder.h

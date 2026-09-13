@@ -22,6 +22,7 @@ set(FORENSIC_TESTS
     test_attackplanner
     test_hashcatstatusparser
     test_jobqueue
+    test_bkcrackbackend
     test_jobpersistence
     test_backendcompose
     test_reportbuilder
