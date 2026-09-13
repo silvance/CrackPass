@@ -70,6 +70,19 @@ AttackPlannerDialog::AttackPlannerDialog(quint32 hashMode, const QString &hashTy
     m_template->addItem(tr("Hybrid Attack"), int(AttackTemplate::HybridAttack));
     m_template->addItem(tr("Custom / Advanced"), int(AttackTemplate::CustomAdvanced));
     top->addWidget(m_template, 1);
+
+    // Recovery engine selector, populated from the engine registry so a new
+    // engine appears here automatically. hashcat is the default and expresses
+    // every template; John runs only the attacks it can express exactly (the
+    // preview says so before the examiner can queue).
+    top->addWidget(new QLabel(tr("Engine:"), this));
+    m_engine = new QComboBox(this);
+    for (const forensic::RecoveryEngine *e : m_engines.engines())
+        m_engine->addItem(e->displayName(), e->id());
+    const int def = m_engine->findData(forensic::RecoveryEngineRegistry::defaultEngineId());
+    if (def >= 0)
+        m_engine->setCurrentIndex(def);
+    top->addWidget(m_engine);
     root->addLayout(top);
 
     auto *knowledge = new QGroupBox(tr("Case knowledge (optional - becomes explicit wordlists, masks and rules)"), this);
@@ -176,8 +189,14 @@ AttackPlannerDialog::AttackPlannerDialog(quint32 hashMode, const QString &hashTy
 
     // Live preview on the common interactions.
     connect(m_template, &QComboBox::currentIndexChanged, this, &AttackPlannerDialog::updatePreview);
+    connect(m_engine, &QComboBox::currentIndexChanged, this, &AttackPlannerDialog::updatePreview);
     updatePreview();
     Q_UNUSED(queueBtn);
+}
+
+QString AttackPlannerDialog::plannedEngineId() const
+{
+    return m_engine->currentData().toString();
 }
 
 void AttackPlannerDialog::requestQueue()
@@ -185,6 +204,11 @@ void AttackPlannerDialog::requestQueue()
     updatePreview();
     if (!m_lastOk) {
         m_status->setText(tr("Cannot queue: the plan is not valid yet."));
+        return;
+    }
+    if (!m_engineOk) {
+        // The selected engine cannot express this attack; refuse rather than
+        // queue an approximation (the reason is already shown in the status).
         return;
     }
     m_queueRequested = true;
@@ -233,6 +257,7 @@ void AttackPlannerDialog::updatePreview()
     const PlanResult r = planner.plan(currentTemplate(), collectKnowledge(), ctx);
     m_lastOk = r.ok;
     m_lastSpec = r.spec;
+    m_engineOk = false; // recomputed below once we have a valid spec + engine
 
     if (!r.ok) {
         m_preview->setPlainText(QString());
@@ -241,6 +266,14 @@ void AttackPlannerDialog::updatePreview()
         return;
     }
 
+    const RecoveryEngine *engine = m_engines.find(plannedEngineId());
+    const QString engineName = engine ? engine->displayName() : plannedEngineId();
+    // A valid plan may still be unexpressible by the chosen engine (e.g. John
+    // cannot run hashcat rule files). Ask the engine before offering to queue.
+    const QString engineReason = engine ? engine->unsupportedReason(r.spec)
+                                        : tr("unknown engine");
+    m_engineOk = engine && engineReason.isEmpty();
+
     const AttackPreview &p = r.preview;
     const QString keyspace = p.estimatedKeyspace >= 0
         ? QLocale().toString(p.estimatedKeyspace)
@@ -248,6 +281,7 @@ void AttackPlannerDialog::updatePreview()
 
     QString text;
     text += tr("Template:        %1\n").arg(p.templateName);
+    text += tr("Engine:          %1\n").arg(engineName);
     text += tr("Hash type:       %1\n").arg(p.hashTypeName.isEmpty() ? tr("(unnamed)") : p.hashTypeName);
     text += tr("Hashcat mode:    -m %1\n").arg(p.hashMode);
     text += tr("Attack mode:     -a %1  (%2)\n").arg(p.attackMode).arg(p.attackModeName);
@@ -262,7 +296,16 @@ void AttackPlannerDialog::updatePreview()
         text += tr("Notes:           %1\n").arg(r.spec.notes);
     m_preview->setPlainText(text);
 
-    m_command->setPlainText(p.command.join(QLatin1Char(' ')));
-    m_status->setText(tr("This is a preview only. No attack is started. Review the command, "
-                         "then run it from Advanced Mode."));
+    // Show the command for the SELECTED engine, built from the same spec.
+    if (m_engineOk) {
+        const QString argv = engine->buildArgs(r.spec).join(QLatin1Char(' '));
+        m_command->setPlainText(engineName + QLatin1Char(' ') + argv);
+        m_status->setText(tr("This is a preview only. No attack is started. Review the "
+                             "command, then Queue Attack to run it with %1.").arg(engineName));
+    } else {
+        m_command->setPlainText(tr("(not runnable by %1)").arg(engineName));
+        m_status->setText(tr("%1 cannot run this attack: %2\n"
+                             "Switch the engine to hashcat, or adjust the plan.")
+                              .arg(engineName, engineReason));
+    }
 }

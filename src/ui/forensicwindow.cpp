@@ -88,6 +88,32 @@ QString probeHashcatVersion(const QString &path)
         .split(QLatin1Char('\n')).value(0).trimmed();
 }
 
+// John has no --version flag; run with no arguments (it prints its version
+// banner and usage, then exits) and pick out the identifying line. Best-effort
+// provenance only -- an empty result does not block the run.
+QString probeJohnVersion(const QString &path)
+{
+    if (path.isEmpty())
+        return QString();
+    QProcess p;
+    p.setProcessChannelMode(QProcess::MergedChannels);
+    p.start(path, {}, QIODevice::ReadOnly);
+    if (!p.waitForStarted(3000))
+        return QString();
+    if (!p.waitForFinished(5000)) {
+        p.kill();
+        p.waitForFinished(1000);
+        return QString();
+    }
+    const QStringList lines = QString::fromUtf8(p.readAll()).split(QLatin1Char('\n'));
+    for (const QString &l : lines) {
+        const QString t = l.trimmed();
+        if (t.contains(QStringLiteral("John the Ripper"), Qt::CaseInsensitive))
+            return t;
+    }
+    return lines.value(0).trimmed();
+}
+
 } // namespace
 
 ForensicWindow::ForensicWindow(QWidget *parent)
@@ -454,17 +480,33 @@ void ForensicWindow::planAttackSelected()
     if (!dlg.queueRequested())
         return; // examiner only previewed; nothing is started
 
-    const QString hashcatPath = SettingsManager::instance().getKey<QString>("hashcatPath");
-    if (hashcatPath.isEmpty()) {
-        QMessageBox::warning(this, tr("Queue Attack"),
-                             tr("Configure the hashcat path in Settings before queuing a job."));
-        return;
+    // Resolve the binary + version for the engine the examiner chose in the
+    // planner, so the recorded provenance matches the tool that actually runs.
+    const QString engineId = dlg.plannedEngineId();
+    QString toolPath, toolVersion;
+    if (engineId == QStringLiteral("john")) {
+        toolPath = SettingsManager::instance().getKey<QString>("johnPath");
+        if (toolPath.isEmpty()) {
+            QMessageBox::warning(this, tr("Queue Attack"),
+                                 tr("Configure the John the Ripper path in Settings before "
+                                    "queuing a John job."));
+            return;
+        }
+        toolVersion = probeJohnVersion(toolPath);
+    } else {
+        toolPath = SettingsManager::instance().getKey<QString>("hashcatPath");
+        if (toolPath.isEmpty()) {
+            QMessageBox::warning(this, tr("Queue Attack"),
+                                 tr("Configure the hashcat path in Settings before queuing a job."));
+            return;
+        }
+        toolVersion = probeHashcatVersion(toolPath);
     }
 
     // The controller builds the reproducible job, lays out its session files,
-    // enqueues it, and persists the record + later state/credentials.
-    m_recovery->queueRecoveryJob(dlg.plannedSpec(), item.id, hashcatPath,
-                                 probeHashcatVersion(hashcatPath));
+    // enqueues it, and persists the record + later state/credentials. It refuses
+    // (via recoveryRefused) if the engine cannot express the attack.
+    m_recovery->queueRecoveryJob(dlg.plannedSpec(), item.id, toolPath, toolVersion, engineId);
     m_tabs->setCurrentIndex(1); // show the Jobs tab
 }
 
