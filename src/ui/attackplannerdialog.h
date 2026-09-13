@@ -7,6 +7,7 @@
 
 #include "forensic/planner/attackplanner.h"
 #include "forensic/planner/attackjobspec.h"
+#include "forensic/recovery/recoveryengineregistry.h"
 #include <QDialog>
 
 class QComboBox;
@@ -35,9 +36,10 @@ public:
                         QWidget *parent = nullptr);
 
 public:
-    // True if the examiner chose to queue; the spec to run.
+    // True if the examiner chose to queue; the spec to run and the engine to run it.
     bool queueRequested() const { return m_queueRequested; }
     forensic::AttackJobSpec plannedSpec() const { return m_lastSpec; }
+    QString plannedEngineId() const;
 
 private slots:
     void updatePreview();
@@ -53,6 +55,7 @@ private:
     QString m_planDir;
 
     QComboBox *m_template = nullptr;
+    QComboBox *m_engine = nullptr;
     QSpinBox *m_minLen = nullptr;
     QSpinBox *m_maxLen = nullptr;
     QLineEdit *m_prefix = nullptr;
@@ -73,8 +76,14 @@ private:
     QCheckBox *m_clsSpecial = nullptr;
 
     forensic::AttackJobSpec m_lastSpec;
-    bool m_lastOk = false;
+    bool m_lastOk = false;         // the planner produced a valid spec
+    bool m_engineOk = false;       // the selected engine can express that spec
     bool m_queueRequested = false;
+
+    // The known recovery engines (hashcat, John, ...). Used to populate the
+    // engine selector and to check whether the chosen engine can express the
+    // planned attack before it is queued.
+    forensic::RecoveryEngineRegistry m_engines = forensic::RecoveryEngineRegistry::withBuiltins();
 
     QPlainTextEdit *m_preview = nullptr;
     QPlainTextEdit *m_command = nullptr;

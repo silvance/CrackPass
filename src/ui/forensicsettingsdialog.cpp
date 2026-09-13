@@ -29,6 +29,7 @@ ForensicSettingsDialog::ForensicSettingsDialog(QWidget *parent)
     auto *engine = new QGroupBox(tr("Cracking engine"), this);
     auto *ef = new QFormLayout(engine);
     addPathRow(ef, tr("hashcat executable"), QStringLiteral("hashcatPath"), false);
+    addPathRow(ef, tr("John the Ripper executable"), QStringLiteral("johnPath"), false);
     root->addWidget(engine);
 
     auto *extractors = new QGroupBox(tr("Extraction utilities (John the Ripper Jumbo)"), this);
