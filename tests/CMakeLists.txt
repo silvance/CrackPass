@@ -16,6 +16,7 @@ set(FORENSIC_TESTS
     test_extractionservice
     test_attackcommandbuilder
     test_johncommandbuilder
+    test_bkcrackcommandbuilder
     test_johnbackend
     test_knowledgematerializer
     test_attackplanner
