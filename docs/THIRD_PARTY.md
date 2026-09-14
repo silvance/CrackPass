@@ -20,6 +20,27 @@ Nothing here requires network access or a commercial license to run.
 | **hashcat** | Cracking engine | MIT | Path configured by the examiner; invoked with `--status-json`. Not redistributed by CaseKey by default. |
 | **John the Ripper Jumbo** — `office2john`, `pdf2john`, `zip2john`, `rar2john`, `7z2john`, `keepass2john` | Hash extraction from encrypted files/containers | GPL-2.0-or-later (with OpenSSL/other permissive parts) | Supplied on the workstation; each extraction records the exact tool + version used. |
 
+## Wordlists / dictionaries
+
+CaseKey ships a **manifest** of built-in dictionaries (`resources/dictionaries/manifest.json`)
+but does **not** commit the wordlist files themselves; they are supplied
+separately for a deployment (see `resources/dictionaries/README.md`). The
+manifest and each library entry record the `source` and `license` of every
+wordlist so a recovery report can cite exactly which dictionary was used.
+
+| Dictionary | Origin | License / attribution | Notes |
+| --- | --- | --- | --- |
+| **CaseKey Common** (`casekey-common`) | Curated by CaseKey contributors from openly redistributable sources | GPL-3.0-or-later | General-purpose default for the Dictionary attack. File supplied separately; never fabricated. |
+| **CaseKey Quick** (`casekey-quick`) | Curated by CaseKey contributors from openly redistributable sources | GPL-3.0-or-later | Small quick-triage list. File supplied separately; never fabricated. |
+| *Imported wordlists* | Added by the examiner at runtime | As recorded by the examiner on import | CaseKey stores the examiner-supplied source/license alongside the entry. |
+
+**Licensing policy for wordlists.** CaseKey does not bundle or redistribute
+proprietary wordlists (for example, Passware dictionaries) or breach-derived
+corpora that lack a documented redistribution basis. Any wordlist added to a
+distribution must have its source and license recorded here and in the
+manifest. Examiner-imported wordlists carry whatever provenance the examiner
+records; that provenance travels with the job and report.
+
 ## GPU / compute runtimes (provided by the platform/driver)
 
 | Component | Purpose | License | Notes |
