@@ -7,9 +7,9 @@
 
 namespace forensic {
 
-QVector<HashcatStatus> HashcatStatusStream::append(const QByteArray &chunk)
+QVector<RecoveryStatus> HashcatStatusStream::append(const QByteArray &chunk)
 {
-    QVector<HashcatStatus> out;
+    QVector<RecoveryStatus> out;
     m_buffer.append(chunk);
 
     int nl;
@@ -20,7 +20,7 @@ QVector<HashcatStatus> HashcatStatusStream::append(const QByteArray &chunk)
         m_buffer.remove(0, nl + 1);
         if (line.isEmpty() || !line.startsWith('{'))
             continue;
-        const HashcatStatus s = HashcatStatusParser::parse(line);
+        const RecoveryStatus s = HashcatStatusParser::parse(line);
         if (s.valid)
             out.append(s);
     }

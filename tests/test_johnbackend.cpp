@@ -111,18 +111,19 @@ void TestJohnBackend::potIgnoresBlankOrColonlessLines()
 
 void TestJohnBackend::progressParsesGuessesAndSpeed()
 {
-    HashcatStatus st;
+    RecoveryStatus st;
     const QString line = QStringLiteral("2g 0:00:00:05 12.34% (ETA: 12:00:00) 4567p/s 4321c/s 4321C/s a..b");
     QVERIFY(JohnExecutionBackend::parseProgressLine(line, st));
     QVERIFY(st.valid);
-    QCOMPARE(st.statusCode, HashcatStatusCode::Running);
+    QCOMPARE(st.state, RecoveryState::Running);
+    QCOMPARE(st.nativeStatusCode, 0); // John never invents a hashcat status code
     QCOMPARE(st.recoveredHashes, 2);
     QCOMPARE(st.aggregateSpeed, static_cast<qint64>(4321)); // prefers c/s
 }
 
 void TestJohnBackend::progressScalesSpeedSuffix()
 {
-    HashcatStatus st;
+    RecoveryStatus st;
     QVERIFY(JohnExecutionBackend::parseProgressLine(
         QStringLiteral("0g 0:00:01:00 1.5Mc/s done"), st));
     QCOMPARE(st.aggregateSpeed, static_cast<qint64>(1500000));
@@ -130,7 +131,7 @@ void TestJohnBackend::progressScalesSpeedSuffix()
 
 void TestJohnBackend::progressRejectsNonStatusLines()
 {
-    HashcatStatus st;
+    RecoveryStatus st;
     QVERIFY(!JohnExecutionBackend::parseProgressLine(
         QStringLiteral("Loaded 1 password hash (PDF ...)"), st));
     QVERIFY(!JohnExecutionBackend::parseProgressLine(QString(), st));

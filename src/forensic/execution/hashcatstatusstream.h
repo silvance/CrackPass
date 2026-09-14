@@ -24,7 +24,7 @@ class HashcatStatusStream
 {
 public:
     // Feed raw bytes; returns every complete, valid status object newly parsed.
-    QVector<HashcatStatus> append(const QByteArray &chunk);
+    QVector<RecoveryStatus> append(const QByteArray &chunk);
 
     // Bytes buffered but not yet terminated by a newline (for diagnostics/tests).
     int pendingBytes() const { return m_buffer.size(); }

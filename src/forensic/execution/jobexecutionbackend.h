@@ -48,7 +48,7 @@ public:
 
 signals:
     void running(const QUuid &jobId);
-    void statusUpdated(const QUuid &jobId, const forensic::HashcatStatus &status);
+    void statusUpdated(const QUuid &jobId, const forensic::RecoveryStatus &status);
     // rawPlaintext is the exact recovered password bytes (see DecodedPlain),
     // carried verbatim so no fidelity is lost before it reaches the case store.
     void cracked(const QUuid &jobId, const QString &hash, const QByteArray &rawPlaintext);

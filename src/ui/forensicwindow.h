@@ -21,7 +21,7 @@ class JobExecutionBackend;
 class RecoveryController;
 struct CrackingJob;
 struct RecoveredCredential;
-struct HashcatStatus;
+struct RecoveryStatus;
 }
 
 /*
@@ -47,7 +47,7 @@ private slots:
     void zipCryptoAttackSelected();
 
     void onJobChanged(const forensic::CrackingJob &job);
-    void onJobStatus(const QUuid &jobId, const forensic::HashcatStatus &status);
+    void onJobStatus(const QUuid &jobId, const forensic::RecoveryStatus &status);
     void onCredentialRecovered(const forensic::RecoveredCredential &cred);
     void pauseSelectedJob();
     void resumeSelectedJob();

@@ -64,16 +64,16 @@ public:
     QList<CrackingJob> jobs() const { return m_jobs; }
     bool hasJob(const QUuid &id) const { return indexOf(id) >= 0; }
     CrackingJob jobById(const QUuid &id) const;
-    HashcatStatus lastStatus(const QUuid &id) const { return m_status.value(id); }
+    RecoveryStatus lastStatus(const QUuid &id) const { return m_status.value(id); }
 
 signals:
     void jobChanged(const forensic::CrackingJob &job);
-    void jobStatus(const QUuid &jobId, const forensic::HashcatStatus &status);
+    void jobStatus(const QUuid &jobId, const forensic::RecoveryStatus &status);
     void credentialRecovered(const forensic::RecoveredCredential &cred);
 
 private slots:
     void onRunning(const QUuid &jobId);
-    void onStatus(const QUuid &jobId, const forensic::HashcatStatus &status);
+    void onStatus(const QUuid &jobId, const forensic::RecoveryStatus &status);
     void onCracked(const QUuid &jobId, const QString &hash, const QByteArray &rawPlaintext);
     void onPaused(const QUuid &jobId);
     void onStopped(const QUuid &jobId);
@@ -100,7 +100,7 @@ private:
     QHash<QString, JobExecutionBackend *> m_backends; // engineId -> backend
     QList<CrackingJob> m_jobs;
     QHash<QUuid, JobPaths> m_paths;
-    QHash<QUuid, HashcatStatus> m_status;
+    QHash<QUuid, RecoveryStatus> m_status;
     QHash<QUuid, bool> m_recoveredFlag; // a credential arrived for this job
     QUuid m_running;                    // currently executing job (null if idle)
 };

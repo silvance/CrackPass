@@ -81,18 +81,19 @@ void TestBkcrackBackend::doesNotReadKeysFromProgress()
 
 void TestBkcrackBackend::parsesProgress()
 {
-    HashcatStatus st;
+    RecoveryStatus st;
     QVERIFY(BkcrackExecutionBackend::parseProgressLine(
         QStringLiteral("50.0 % (8388608 / 16777216)"), st));
     QVERIFY(st.valid);
-    QCOMPARE(st.statusCode, HashcatStatusCode::Running);
+    QCOMPARE(st.state, RecoveryState::Running);
+    QCOMPARE(st.nativeStatusCode, 0); // bkcrack never invents a hashcat status code
     QCOMPARE(st.progressDone, Q_INT64_C(8388608));
     QCOMPARE(st.progressTotal, Q_INT64_C(16777216));
 }
 
 void TestBkcrackBackend::rejectsNonProgress()
 {
-    HashcatStatus st;
+    RecoveryStatus st;
     QVERIFY(!BkcrackExecutionBackend::parseProgressLine(
         QStringLiteral("Keys: c1cb4c4d 887e6dad 42163b2a"), st));
     QVERIFY(!BkcrackExecutionBackend::parseProgressLine(QString(), st));

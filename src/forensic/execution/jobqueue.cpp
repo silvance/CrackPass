@@ -162,7 +162,7 @@ void JobQueue::onRunning(const QUuid &jobId)
     setState(jobId, JobState::Running);
 }
 
-void JobQueue::onStatus(const QUuid &jobId, const HashcatStatus &status)
+void JobQueue::onStatus(const QUuid &jobId, const RecoveryStatus &status)
 {
     m_status.insert(jobId, status);
     // First status is a good point to guarantee the Running state.

@@ -32,9 +32,10 @@ static QByteArray sampleStatus()
 
 void TestHashcatStatusParser::parsesRunningStatus()
 {
-    const HashcatStatus s = HashcatStatusParser::parse(sampleStatus());
+    const RecoveryStatus s = HashcatStatusParser::parse(sampleStatus());
     QVERIFY(s.valid);
-    QCOMPARE(s.statusCode, HashcatStatusCode::Running);
+    QCOMPARE(s.nativeStatusCode, HashcatStatusCode::Running);
+    QCOMPARE(s.state, RecoveryState::Running); // native code mapped to neutral state
     QCOMPARE(s.progressDone, qint64(500));
     QCOMPARE(s.progressTotal, qint64(1000));
     QCOMPARE(s.totalHashes, 1);
@@ -43,13 +44,13 @@ void TestHashcatStatusParser::parsesRunningStatus()
 
 void TestHashcatStatusParser::aggregatesDeviceSpeeds()
 {
-    const HashcatStatus s = HashcatStatusParser::parse(sampleStatus());
+    const RecoveryStatus s = HashcatStatusParser::parse(sampleStatus());
     QCOMPARE(s.aggregateSpeed, qint64(2000)); // 1200 + 800
 }
 
 void TestHashcatStatusParser::percentAndRemaining()
 {
-    const HashcatStatus s = HashcatStatusParser::parse(sampleStatus());
+    const RecoveryStatus s = HashcatStatusParser::parse(sampleStatus());
     QCOMPARE(s.progressPercent(), 50.0);
     QCOMPARE(s.remainingSeconds(1040), qint64(60)); // 1100 - 1040
     QCOMPARE(s.remainingSeconds(2000), qint64(0));  // past estimate -> clamped
@@ -67,9 +68,10 @@ void TestHashcatStatusParser::parseLatestPicksLastValid()
     chunk += "some banner line\n";
     chunk += "{\"status\":3,\"progress\":[10,100]}\n";
     chunk += "{\"status\":5,\"progress\":[100,100]}\n";
-    const HashcatStatus s = HashcatStatusParser::parseLatest(chunk);
+    const RecoveryStatus s = HashcatStatusParser::parseLatest(chunk);
     QVERIFY(s.valid);
-    QCOMPARE(s.statusCode, HashcatStatusCode::Exhausted);
+    QCOMPARE(s.nativeStatusCode, HashcatStatusCode::Exhausted);
+    QCOMPARE(s.state, RecoveryState::Exhausted);
     QCOMPARE(s.progressDone, qint64(100));
 }
 

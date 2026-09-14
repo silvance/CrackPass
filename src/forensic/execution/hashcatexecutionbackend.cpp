@@ -115,10 +115,10 @@ void HashcatExecutionBackend::drainStatus(const QUuid &jobId)
         return;
     const QByteArray chunk = ctx->proc->readAllStandardOutput();
     // Reassemble across reads: a JSON status line may be split between chunks.
-    const QVector<HashcatStatus> statuses = ctx->statusStream.append(chunk);
+    const QVector<RecoveryStatus> statuses = ctx->statusStream.append(chunk);
     if (!statuses.isEmpty()) {
-        const HashcatStatus &status = statuses.last();
-        ctx->lastStatusCode = status.statusCode;
+        const RecoveryStatus &status = statuses.last();
+        ctx->lastStatusCode = status.nativeStatusCode;
         emit statusUpdated(jobId, status);
     }
     drainCredentials(jobId);
