@@ -60,6 +60,8 @@ private slots:
     void removeImportedDeletesCopyButKeepsReferencedOriginal();
     void builtinCannotBeRemoved();
     void revalidateRerecordsImportedBaseline();
+    void removeImportedRollsBackWhenPersistFails();
+    void revalidateRollsBackWhenPersistFails();
     void defaultPrefersCaseKeyCommonWhenPresent();
     void buildsWhenBuiltinFilesAbsent();
 };
@@ -304,6 +306,64 @@ void TestDictionaryLibrary::revalidateRerecordsImportedBaseline()
     QFile::remove(wl);
     QVERIFY(!d.revalidate(id, nullptr, nullptr, &err));
     QVERIFY(!err.isEmpty());
+}
+
+// Break the imported manifest so its atomic write fails: replace it with a
+// directory (a file rename can never overwrite a directory, on any platform).
+static void breakManifest(const QString &libDir)
+{
+    const QString manifest = QDir(libDir).filePath(QStringLiteral("manifest.json"));
+    QFile::remove(manifest);
+    QVERIFY(QDir().mkpath(manifest));
+}
+
+void TestDictionaryLibrary::removeImportedRollsBackWhenPersistFails()
+{
+    QTemporaryDir src, lib;
+    DictionaryLibrary d;
+    d.setLibraryDir(lib.path());
+    QVERIFY(d.reload());
+    QString err;
+
+    const QString copyWl = write(src.filePath("copy.txt"), "c\n");
+    const QString id = d.importWordlist(copyWl, "Copy", "", "", "", true, &err);
+    QVERIFY2(!id.isEmpty(), qPrintable(err));
+    const QString copyPath = d.entry(id).absolutePath;
+    QVERIFY(QFileInfo::exists(copyPath));
+
+    breakManifest(lib.path());
+    // Removal must fail and leave the registration AND the owned copy intact --
+    // no phantom removal that exists only in memory.
+    QVERIFY(!d.removeImported(id, &err));
+    QVERIFY(!err.isEmpty());
+    QVERIFY(d.contains(id));                    // still registered
+    QVERIFY(QFileInfo::exists(copyPath));       // copy not deleted
+}
+
+void TestDictionaryLibrary::revalidateRollsBackWhenPersistFails()
+{
+    QTemporaryDir src, lib;
+    const QString wl = write(src.filePath("w.txt"), "one\ntwo\n");
+    DictionaryLibrary d;
+    d.setLibraryDir(lib.path());
+    QVERIFY(d.reload());
+    QString err;
+    const QString id = d.importWordlist(wl, "W", "", "", "", false, &err);
+    QVERIFY2(!id.isEmpty(), qPrintable(err));
+    QCOMPARE(d.entry(id).candidateCount, qint64(2));
+    const QString baselineSha = d.entry(id).sha256;
+
+    // Drift the file, then make persistence impossible.
+    write(wl, "one\ntwo\nthree\nfour\n");
+    breakManifest(lib.path());
+
+    // Revalidate must fail and NOT advance the in-memory baseline: the recorded
+    // sha/count stay at the previous values, so drift is still reported.
+    QVERIFY(!d.revalidate(id, nullptr, nullptr, &err));
+    QVERIFY(!err.isEmpty());
+    QCOMPARE(d.entry(id).candidateCount, qint64(2));      // unchanged
+    QCOMPARE(d.entry(id).sha256, baselineSha);            // unchanged
+    QCOMPARE(d.checkIntegrity(id), DictionaryLibrary::IntegrityStatus::Modified);
 }
 
 void TestDictionaryLibrary::defaultPrefersCaseKeyCommonWhenPresent()

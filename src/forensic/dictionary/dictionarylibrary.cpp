@@ -301,9 +301,15 @@ bool DictionaryLibrary::removeImported(const QString &id, QString *error)
     }
 
     const QString copyPath = e.absolutePath;
+    // Transactional: mutate a candidate state, persist, and only keep the change
+    // if the manifest write succeeds. On failure the in-memory registration is
+    // restored so it always matches disk (no phantom removal).
+    const QList<DictionaryEntry> snapshot = m_entries;
     m_entries.removeAt(idx);
-    if (!saveImported(error))
+    if (!saveImported(error)) {
+        m_entries = snapshot;
         return false;
+    }
 
     // Only delete a file the library owns (a copy under the library dir); a
     // referenced original is left untouched.
@@ -346,34 +352,45 @@ bool DictionaryLibrary::revalidate(const QString &id, qint64 *candidateCountOut,
         if (error) *error = QStringLiteral("No such dictionary: %1").arg(id);
         return false;
     }
-    DictionaryEntry &e = m_entries[idx];
-    if (!e.fileExists()) {
-        if (error) *error = QStringLiteral("The wordlist file is not present: %1").arg(e.absolutePath);
+    // Read via a copy: we must not hold a mutable reference into m_entries while
+    // snapshotting it below, or the reference would alias the shared (COW) buffer
+    // and defeat the rollback.
+    const DictionaryEntry e0 = m_entries.at(idx);
+    if (!e0.fileExists()) {
+        if (error) *error = QStringLiteral("The wordlist file is not present: %1").arg(e0.absolutePath);
         return false;
     }
 
     QString hashError;
-    const QString sha = HashingService::sha256File(e.absolutePath, &hashError);
+    const QString sha = HashingService::sha256File(e0.absolutePath, &hashError);
     if (sha.isEmpty()) {
-        if (error) *error = QStringLiteral("Could not hash %1: %2").arg(e.absolutePath, hashError);
+        if (error) *error = QStringLiteral("Could not hash %1: %2").arg(e0.absolutePath, hashError);
         return false;
     }
-    const qint64 count = countCandidates(e.absolutePath, error);
+    const qint64 count = countCandidates(e0.absolutePath, error);
     if (count < 0)
         return false; // *error already set
-    const qint64 size = QFileInfo(e.absolutePath).size();
+    const qint64 size = QFileInfo(e0.absolutePath).size();
 
     if (sha256Out) *sha256Out = sha;
     if (candidateCountOut) *candidateCountOut = count;
 
     // Only an imported entry's baseline is writable; a builtin's lives in the
     // read-only bundled manifest, so leave its recorded values untouched.
-    if (e.origin == DictionaryOrigin::Imported) {
-        e.sha256 = sha;
-        e.candidateCount = count;
-        e.sizeBytes = size;
-        if (!saveImported(error))
+    if (e0.origin == DictionaryOrigin::Imported) {
+        // Transactional: advance the baseline on a candidate state, persist, and
+        // only keep it if the manifest write succeeds. On failure the previous
+        // SHA/count/size baseline is restored so it always matches disk. Mutate
+        // via operator[] (after snapshotting) so the write detaches from the
+        // snapshot rather than aliasing its buffer.
+        const QList<DictionaryEntry> snapshot = m_entries;
+        m_entries[idx].sha256 = sha;
+        m_entries[idx].candidateCount = count;
+        m_entries[idx].sizeBytes = size;
+        if (!saveImported(error)) {
+            m_entries = snapshot; // roll back to the recorded baseline
             return false;
+        }
     }
     return true;
 }
