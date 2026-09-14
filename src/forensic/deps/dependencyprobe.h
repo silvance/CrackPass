@@ -48,6 +48,8 @@ struct DependencyReport
 {
     ToolStatus hashcat;
     QString hashcatBackendInfo;   // raw `hashcat -I` output (devices)
+    ToolStatus john;              // John the Ripper cracking engine
+    ToolStatus bkcrack;           // bkcrack ZipCrypto known-plaintext engine
     QList<ToolStatus> extractors; // office2john, pdf2john, ...
     ResourceStatus resources;
 };
@@ -68,6 +70,10 @@ public:
 
 private:
     ToolStatus probeHashcat();
+    ToolStatus probeJohn();
+    ToolStatus probeBkcrack();
+    ToolStatus probeEngineBanner(const QString &id, const QString &settingsKey,
+                                 const QString &bannerNeedle);
     ToolStatus probeExtractor(const QString &id);
     ResourceStatus probeResources() const;
 

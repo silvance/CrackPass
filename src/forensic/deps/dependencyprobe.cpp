@@ -71,6 +71,9 @@ ToolStatus DependencyProbe::resolveTool(const QString &id, const QString &settin
     if (id == QStringLiteral("hashcat")) {
         portable << QDir(m_appDir).filePath(QStringLiteral("tools/hashcat/hashcat"))
                  << QDir(m_appDir).filePath(QStringLiteral("tools/hashcat/hashcat.exe"));
+    } else if (id == QStringLiteral("bkcrack")) {
+        portable << QDir(m_appDir).filePath(QStringLiteral("tools/bkcrack/bkcrack"))
+                 << QDir(m_appDir).filePath(QStringLiteral("tools/bkcrack/bkcrack.exe"));
     } else {
         for (const QString &base : {QStringLiteral("tools/john/run/"), QStringLiteral("tools/john/")}) {
             for (const QString &ext : {QString(), QStringLiteral(".exe"),
@@ -120,6 +123,50 @@ ToolStatus DependencyProbe::probeHashcat()
         t.detail = QStringLiteral("self-test failed: %1").arg(r.started ? r.stdErr : r.error);
     }
     return t;
+}
+
+ToolStatus DependencyProbe::probeEngineBanner(const QString &id, const QString &settingsKey,
+                                              const QString &bannerNeedle)
+{
+    ToolStatus t = resolveTool(id, settingsKey);
+    if (!t.found || !m_runner)
+        return t;
+    // John and bkcrack have no --version flag: run with no arguments (they print
+    // an identifying banner + usage, often to stderr, then exit non-zero) and
+    // pick the banner line out of either stream. A non-zero exit is expected, so
+    // "found the banner" -- not the exit code -- decides the self-test.
+    QStringList args = t.prefixArgs; // empty for a native engine
+    const ProcessRunner::Result r = m_runner->run(t.program, args, QString(), 5000);
+    t.selfTestRun = true;
+    if (!r.started) {
+        t.selfTestOk = false;
+        t.detail = QStringLiteral("self-test failed: %1").arg(r.error);
+        return t;
+    }
+    const QStringList lines = (r.stdOut + QLatin1Char('\n') + r.stdErr).split(QLatin1Char('\n'));
+    for (const QString &l : lines) {
+        const QString line = l.trimmed();
+        if (line.contains(bannerNeedle, Qt::CaseInsensitive)) {
+            t.version = line;
+            break;
+        }
+    }
+    t.selfTestOk = !t.version.isEmpty();
+    t.detail = t.selfTestOk ? QStringLiteral("self-test: banner OK")
+                            : QStringLiteral("ran but no %1 banner seen").arg(bannerNeedle);
+    return t;
+}
+
+ToolStatus DependencyProbe::probeJohn()
+{
+    return probeEngineBanner(QStringLiteral("john"), QStringLiteral("johnPath"),
+                             QStringLiteral("John the Ripper"));
+}
+
+ToolStatus DependencyProbe::probeBkcrack()
+{
+    return probeEngineBanner(QStringLiteral("bkcrack"), QStringLiteral("bkcrackPath"),
+                             QStringLiteral("bkcrack"));
 }
 
 ToolStatus DependencyProbe::probeExtractor(const QString &id)
@@ -172,6 +219,8 @@ DependencyReport DependencyProbe::run()
         if (r.started)
             rep.hashcatBackendInfo = r.stdOut.trimmed();
     }
+    rep.john = probeJohn();
+    rep.bkcrack = probeBkcrack();
     for (const QString &id : extractorIds())
         rep.extractors.append(probeExtractor(id));
     rep.resources = probeResources();
