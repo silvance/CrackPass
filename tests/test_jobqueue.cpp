@@ -62,6 +62,7 @@ private slots:
     void legacyNoEngineRoutesToDefault();
     void hashcatEngineRoutesToDefault();
     void unknownEngineRefusesAndDoesNotLaunch();
+    void bkcrackResultIsKeyMaterial();
 };
 
 void TestJobQueue::statusMovesToRunning()
@@ -246,6 +247,28 @@ void TestJobQueue::unknownEngineRefusesAndDoesNotLaunch()
     QVERIFY(hashcat.started.isEmpty());
     QVERIFY(john.started.isEmpty());
     QVERIFY(q.jobById(id).result.contains(QStringLiteral("Unknown recovery engine")));
+}
+
+void TestJobQueue::bkcrackResultIsKeyMaterial()
+{
+    // A bkcrack job's recovered result is key material, not a password, and
+    // carries the engine's id for provenance.
+    FakeBackend hashcat;
+    FakeBackend bkcrack;
+    JobQueue q(&hashcat);
+    q.registerBackend(QStringLiteral("bkcrack"), &bkcrack);
+
+    forensic::RecoveredCredential cred;
+    QObject::connect(&q, &JobQueue::credentialRecovered, &q,
+                     [&](const forensic::RecoveredCredential &c) { cred = c; });
+
+    CrackingJob j = job();
+    j.engineId = QStringLiteral("bkcrack");
+    const QUuid id = q.enqueue(j, {});
+    bkcrack.fireCracked(id, "/case/e.zip!secret.doc", "c1cb4c4d 887e6dad 42163b2a");
+
+    QCOMPARE(cred.engineId, QStringLiteral("bkcrack"));
+    QCOMPARE(cred.kind, forensic::ResultKind::InternalKey);
 }
 
 QTEST_GUILESS_MAIN(TestJobQueue)

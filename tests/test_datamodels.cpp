@@ -13,6 +13,7 @@ using forensic::ComputeDevice;
 using forensic::CrackingJob;
 using forensic::JobState;
 using forensic::RecoveredCredential;
+using forensic::ResultKind;
 
 class TestDataModels : public QObject
 {
@@ -22,6 +23,7 @@ private slots:
     void crackingJobRoundTrip();
     void legacyHashcatJobLoads();
     void recoveredCredentialRoundTrip();
+    void legacyCredentialIsPassword();
     void nonUtf8CredentialRoundTrip();
     void legacyCredentialWithoutRawBytes();
     void runtimeComputation();
@@ -97,9 +99,11 @@ void TestDataModels::recoveredCredentialRoundTrip()
     c.caseId = "case-1";
     c.jobId = QUuid::createUuid();
     c.evidenceId = QUuid::createUuid();
-    c.hash = "$pdf$...";
-    c.plaintext = "hunter2";
-    c.rawPlaintext = QByteArray("hunter2");
+    c.engineId = "bkcrack";
+    c.kind = ResultKind::InternalKey;
+    c.hash = "/case/e.zip!secret.doc";
+    c.plaintext = "c1cb4c4d 887e6dad 42163b2a";
+    c.rawPlaintext = QByteArray("c1cb4c4d 887e6dad 42163b2a");
     c.encoding = "utf-8";
     c.recoveredUtc = QDateTime::currentDateTimeUtc();
 
@@ -107,10 +111,26 @@ void TestDataModels::recoveredCredentialRoundTrip()
     QCOMPARE(back.id, c.id);
     QCOMPARE(back.jobId, c.jobId);
     QCOMPARE(back.evidenceId, c.evidenceId);
+    QCOMPARE(back.engineId, c.engineId);
+    QCOMPARE(back.kind, ResultKind::InternalKey); // key material, not a password
     QCOMPARE(back.hash, c.hash);
     QCOMPARE(back.plaintext, c.plaintext);
     QCOMPARE(back.rawPlaintext, c.rawPlaintext);
     QCOMPARE(back.encoding, c.encoding);
+}
+
+void TestDataModels::legacyCredentialIsPassword()
+{
+    // A record written before result kinds existed has no "kind"/"engineId";
+    // it must load as a recovered Password.
+    QJsonObject obj;
+    obj[QStringLiteral("id")] = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    obj[QStringLiteral("hash")] = QStringLiteral("$pdf$...");
+    obj[QStringLiteral("plaintext")] = QStringLiteral("hunter2");
+    const RecoveredCredential c = RecoveredCredential::fromJson(obj);
+    QCOMPARE(c.kind, ResultKind::Password);
+    QCOMPARE(c.plaintext, QStringLiteral("hunter2"));
+    QVERIFY(c.engineId.isEmpty());
 }
 
 void TestDataModels::nonUtf8CredentialRoundTrip()
