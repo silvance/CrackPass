@@ -98,6 +98,10 @@ add_library(forensic_core STATIC
     src/forensic/report/reportbuilder.cpp
     src/forensic/report/reportrenderer.h
     src/forensic/report/reportrenderer.cpp
+    src/forensic/dictionary/dictionaryentry.h
+    src/forensic/dictionary/dictionaryentry.cpp
+    src/forensic/dictionary/dictionarylibrary.h
+    src/forensic/dictionary/dictionarylibrary.cpp
     src/forensic/hashingservice.h
     src/forensic/hashingservice.cpp
     src/forensic/jsonutil.h

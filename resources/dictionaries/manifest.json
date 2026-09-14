@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "comment": "Bundled dictionary manifest. It DECLARES the built-in wordlists CaseKey ships with; it never contains password data itself. Each 'path' is resolved relative to this manifest's directory. The wordlist files are supplied separately (see README.md in this directory) and may be absent in a source checkout, in which case CaseKey shows the entry as 'file not supplied' and never fabricates candidates.",
+  "dictionaries": [
+    {
+      "id": "casekey-common",
+      "displayName": "CaseKey Common",
+      "description": "A general-purpose wordlist for the default Dictionary attack. A broad set of common passwords and passphrases; a sensible first pass that requires no knowledge of the specific case.",
+      "path": "casekey-common.txt",
+      "candidateCount": -1,
+      "sizeBytes": -1,
+      "sha256": "",
+      "source": "Curated by CaseKey contributors from openly redistributable sources.",
+      "license": "GPL-3.0-or-later (see docs/THIRD_PARTY.md for per-source attribution)."
+    },
+    {
+      "id": "casekey-quick",
+      "displayName": "CaseKey Quick",
+      "description": "A small, fast wordlist for a quick triage pass: the most common passwords only. Finishes in seconds and requires no case knowledge.",
+      "path": "casekey-quick.txt",
+      "candidateCount": -1,
+      "sizeBytes": -1,
+      "sha256": "",
+      "source": "Curated by CaseKey contributors from openly redistributable sources.",
+      "license": "GPL-3.0-or-later (see docs/THIRD_PARTY.md for per-source attribution)."
+    }
+  ]
+}

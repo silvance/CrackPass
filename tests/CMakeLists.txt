@@ -33,6 +33,7 @@ set(FORENSIC_TESTS
     test_toolchainservice
     test_recoverycontroller
     test_recoveryengineregistry
+    test_dictionarylibrary
 )
 
 foreach(test_name ${FORENSIC_TESTS})
