@@ -58,10 +58,10 @@ static void seedCase(CaseWorkspace *ws, QTemporaryDir &src, QUuid &jobIdOut)
     job.evidenceId = intake.item.id;
     job.hashMode = 10500;
     job.attackMode = 0;
-    job.hashcatVersion = "v7.1.2";
+    job.engineVersion = "v7.1.2";
     job.wordlists = {"rockyou.txt"};
     job.rules = {"best64.rule"};
-    job.hashcatArgs = {"-m", "10500", "-a", "0", "hash.txt", "rockyou.txt", "-r", "best64.rule"};
+    job.engineArgs = {"-m", "10500", "-a", "0", "hash.txt", "rockyou.txt", "-r", "best64.rule"};
     job.startedUtc = QDateTime::currentDateTimeUtc();
     job.endedUtc = job.startedUtc.addSecs(42);
     job.state = JobState::Recovered;

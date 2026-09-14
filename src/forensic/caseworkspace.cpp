@@ -458,7 +458,8 @@ bool CaseWorkspace::saveJob(const CrackingJob &job, QString *error)
         details[QStringLiteral("evidenceId")] = job.evidenceId.toString(QUuid::WithoutBraces);
         details[QStringLiteral("hashMode")] = static_cast<double>(job.hashMode);
         details[QStringLiteral("attackMode")] = job.attackMode;
-        details[QStringLiteral("hashcatArgs")] = job.hashcatArgs.join(QLatin1Char(' '));
+        details[QStringLiteral("engineId")] = job.engineId;
+        details[QStringLiteral("engineArgs")] = job.engineArgs.join(QLatin1Char(' '));
         tx.audit(QStringLiteral("job_created"), QStringLiteral("job"),
                  job.id.toString(QUuid::WithoutBraces), details);
     }

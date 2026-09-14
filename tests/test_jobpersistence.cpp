@@ -30,7 +30,7 @@ void TestJobPersistence::saveJobAndReopen()
         j.id = jobId;
         j.caseId = ws->info().id;
         j.hashMode = 13400;
-        j.hashcatArgs = {"-m", "13400", "-a", "0", "hash.txt", "wl.txt"};
+        j.engineArgs = {"-m", "13400", "-a", "0", "hash.txt", "wl.txt"};
         j.state = JobState::Exhausted;
         QString err;
         QVERIFY2(ws->saveJob(j, &err), qPrintable(err));

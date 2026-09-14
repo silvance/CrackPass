@@ -68,7 +68,7 @@ QJsonObject CrackingJob::toJson() const
         devArray.append(d.toJson());
 
     QJsonArray argsArray;
-    for (const QString &a : hashcatArgs)
+    for (const QString &a : engineArgs)
         argsArray.append(a);
 
     QJsonObject obj;
@@ -78,13 +78,17 @@ QJsonObject CrackingJob::toJson() const
     obj[QStringLiteral("hashMode")] = static_cast<double>(hashMode);
     obj[QStringLiteral("attackMode")] = attackMode;
     obj[QStringLiteral("engineId")] = engineId;
-    obj[QStringLiteral("hashcatArgs")] = argsArray;
-    obj[QStringLiteral("hashcatPath")] = hashcatPath;
+    obj[QStringLiteral("engineDisplayName")] = engineDisplayName;
+    // Engine-neutral field names (records written before the migration used the
+    // hashcat* names; fromJson still reads those).
+    obj[QStringLiteral("engineArgs")] = argsArray;
+    obj[QStringLiteral("enginePath")] = enginePath;
+    obj[QStringLiteral("engineVersion")] = engineVersion;
+    obj[QStringLiteral("engineExeSha256")] = engineExeSha256;
     obj[QStringLiteral("hashFile")] = hashFile;
     obj[QStringLiteral("mask")] = mask;
     { QJsonArray a; for (const QString &w : wordlists) a.append(w); obj[QStringLiteral("wordlists")] = a; }
     { QJsonArray a; for (const QString &r : rules) a.append(r); obj[QStringLiteral("rules")] = a; }
-    obj[QStringLiteral("hashcatVersion")] = hashcatVersion;
     obj[QStringLiteral("devices")] = devArray;
     obj[QStringLiteral("startedUtc")] = jsonutil::fromDateTime(startedUtc);
     obj[QStringLiteral("endedUtc")] = jsonutil::fromDateTime(endedUtc);
@@ -105,14 +109,25 @@ CrackingJob CrackingJob::fromJson(const QJsonObject &obj)
     j.engineId = obj.value(QStringLiteral("engineId")).toString();
     if (j.engineId.isEmpty())
         j.engineId = QStringLiteral("hashcat");
-    for (const QJsonValue &v : obj.value(QStringLiteral("hashcatArgs")).toArray())
-        j.hashcatArgs.append(v.toString());
-    j.hashcatPath = obj.value(QStringLiteral("hashcatPath")).toString();
+    j.engineDisplayName = obj.value(QStringLiteral("engineDisplayName")).toString();
+    // Engine-neutral names first; fall back to the legacy hashcat* names so
+    // cases written before the migration still load with full provenance.
+    const QJsonValue argsVal = obj.contains(QStringLiteral("engineArgs"))
+        ? obj.value(QStringLiteral("engineArgs"))
+        : obj.value(QStringLiteral("hashcatArgs"));
+    for (const QJsonValue &v : argsVal.toArray())
+        j.engineArgs.append(v.toString());
+    j.enginePath = obj.contains(QStringLiteral("enginePath"))
+        ? obj.value(QStringLiteral("enginePath")).toString()
+        : obj.value(QStringLiteral("hashcatPath")).toString();
+    j.engineVersion = obj.contains(QStringLiteral("engineVersion"))
+        ? obj.value(QStringLiteral("engineVersion")).toString()
+        : obj.value(QStringLiteral("hashcatVersion")).toString();
+    j.engineExeSha256 = obj.value(QStringLiteral("engineExeSha256")).toString();
     j.hashFile = obj.value(QStringLiteral("hashFile")).toString();
     j.mask = obj.value(QStringLiteral("mask")).toString();
     for (const QJsonValue &v : obj.value(QStringLiteral("wordlists")).toArray()) j.wordlists.append(v.toString());
     for (const QJsonValue &v : obj.value(QStringLiteral("rules")).toArray()) j.rules.append(v.toString());
-    j.hashcatVersion = obj.value(QStringLiteral("hashcatVersion")).toString();
     for (const QJsonValue &v : obj.value(QStringLiteral("devices")).toArray())
         j.devices.append(ComputeDevice::fromJson(v.toObject()));
     j.startedUtc = jsonutil::toDateTime(obj.value(QStringLiteral("startedUtc")).toString());

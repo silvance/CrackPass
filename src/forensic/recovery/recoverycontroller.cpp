@@ -6,6 +6,7 @@
 
 #include "forensic/caseworkspace.h"
 #include "forensic/bkcrack/bkcrackcommandbuilder.h"
+#include "forensic/hashingservice.h"
 
 #include <QDir>
 
@@ -39,9 +40,11 @@ CrackingJob RecoveryController::buildJob(const RecoveryEngine &engine, const Att
     job.hashMode = spec.hashMode;
     job.attackMode = spec.attackMode;
     job.engineId = engine.id();
-    job.hashcatPath = toolPath;
-    job.hashcatVersion = toolVersion;
-    job.hashcatArgs = engine.buildArgs(spec);
+    job.engineDisplayName = engine.displayName();
+    job.enginePath = toolPath;
+    job.engineVersion = toolVersion;
+    job.engineExeSha256 = HashingService::sha256File(toolPath); // best-effort (empty if unreadable)
+    job.engineArgs = engine.buildArgs(spec);
     job.hashFile = spec.hashFile;
     job.wordlists = spec.wordlists;
     job.rules = spec.rules;
@@ -107,9 +110,11 @@ QUuid RecoveryController::queueBkcrackJob(const BkcrackAttackSpec &spec, const Q
     job.caseId = m_workspace->info().id;
     job.evidenceId = evidenceId;
     job.engineId = QStringLiteral("bkcrack");
-    job.hashcatPath = toolPath;    // the resolved bkcrack binary (field name is historical)
-    job.hashcatVersion = toolVersion;
-    job.hashcatArgs = built.args;  // the bkcrack argv
+    job.engineDisplayName = QStringLiteral("bkcrack");
+    job.enginePath = toolPath;     // the resolved bkcrack binary
+    job.engineVersion = toolVersion;
+    job.engineExeSha256 = HashingService::sha256File(toolPath); // best-effort
+    job.engineArgs = built.args;   // the bkcrack argv
     job.hashFile = spec.zipPath;   // the archive under attack, for reference/reporting
 
     const QString jobDir = m_workspace->jobDir(job.id);

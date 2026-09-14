@@ -5,6 +5,8 @@
 #include "forensic/crackingjob.h"
 #include "forensic/recoveredcredential.h"
 
+#include <QJsonArray>
+#include <QJsonObject>
 #include <QtTest>
 
 using forensic::ComputeDevice;
@@ -18,6 +20,7 @@ class TestDataModels : public QObject
 
 private slots:
     void crackingJobRoundTrip();
+    void legacyHashcatJobLoads();
     void recoveredCredentialRoundTrip();
     void nonUtf8CredentialRoundTrip();
     void legacyCredentialWithoutRawBytes();
@@ -33,25 +36,58 @@ void TestDataModels::crackingJobRoundTrip()
     j.hashMode = 13400;
     j.attackMode = 0;
     j.engineId = "hashcat";
-    j.hashcatArgs = {"-m", "13400", "-a", "0", "hash.txt", "words.txt"};
-    j.hashcatPath = "/usr/bin/hashcat";
-    j.hashcatVersion = "v7.1.2";
+    j.engineDisplayName = "hashcat";
+    j.engineArgs = {"-m", "13400", "-a", "0", "hash.txt", "words.txt"};
+    j.enginePath = "/usr/bin/hashcat";
+    j.engineVersion = "v7.1.2";
+    j.engineExeSha256 = "abc123";
     j.devices = {ComputeDevice{1, "NVIDIA RTX 4090", "CUDA"}};
     j.startedUtc = QDateTime::currentDateTimeUtc();
     j.endedUtc = j.startedUtc.addSecs(90);
     j.state = JobState::Recovered;
     j.result = "cracked";
 
-    const CrackingJob back = CrackingJob::fromJson(j.toJson());
+    const QJsonObject obj = j.toJson();
+    // New records use engine-neutral field names, not the legacy hashcat* ones.
+    QVERIFY(obj.contains(QStringLiteral("engineArgs")));
+    QVERIFY(obj.contains(QStringLiteral("enginePath")));
+    QVERIFY(obj.contains(QStringLiteral("engineVersion")));
+    QVERIFY(!obj.contains(QStringLiteral("hashcatArgs")));
+
+    const CrackingJob back = CrackingJob::fromJson(obj);
     QCOMPARE(back.id, j.id);
     QCOMPARE(back.evidenceId, j.evidenceId);
     QCOMPARE(back.hashMode, j.hashMode);
-    QCOMPARE(back.hashcatArgs, j.hashcatArgs);
-    QCOMPARE(back.hashcatVersion, j.hashcatVersion);
+    QCOMPARE(back.engineArgs, j.engineArgs);
+    QCOMPARE(back.enginePath, j.enginePath);
+    QCOMPARE(back.engineVersion, j.engineVersion);
+    QCOMPARE(back.engineDisplayName, j.engineDisplayName);
+    QCOMPARE(back.engineExeSha256, j.engineExeSha256);
     QCOMPARE(back.engineId, j.engineId);
     QCOMPARE(back.devices.size(), 1);
     QCOMPARE(back.devices.first().name, QStringLiteral("NVIDIA RTX 4090"));
     QCOMPARE(back.state, JobState::Recovered);
+}
+
+void TestDataModels::legacyHashcatJobLoads()
+{
+    // A job record written before the engine-neutral migration used hashcat*
+    // field names and no engineId. It must load with full provenance and
+    // migrate to engineId "hashcat".
+    QJsonObject obj;
+    obj[QStringLiteral("id")] = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    obj[QStringLiteral("caseId")] = QStringLiteral("case-legacy");
+    obj[QStringLiteral("hashMode")] = 13400;
+    obj[QStringLiteral("hashcatPath")] = QStringLiteral("/usr/bin/hashcat");
+    obj[QStringLiteral("hashcatVersion")] = QStringLiteral("v6.2.6");
+    QJsonArray args; args.append(QStringLiteral("-m")); args.append(QStringLiteral("13400"));
+    obj[QStringLiteral("hashcatArgs")] = args;
+
+    const CrackingJob j = CrackingJob::fromJson(obj);
+    QCOMPARE(j.engineId, QStringLiteral("hashcat")); // migrated from absent
+    QCOMPARE(j.enginePath, QStringLiteral("/usr/bin/hashcat"));
+    QCOMPARE(j.engineVersion, QStringLiteral("v6.2.6"));
+    QCOMPARE(j.engineArgs, (QStringList{QStringLiteral("-m"), QStringLiteral("13400")}));
 }
 
 void TestDataModels::recoveredCredentialRoundTrip()

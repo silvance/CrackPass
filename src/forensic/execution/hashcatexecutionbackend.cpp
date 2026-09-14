@@ -32,7 +32,7 @@ QStringList HashcatExecutionBackend::composeArgs(const CrackingJob &job, const S
         if (!opts.restorePath.isEmpty())
             args << QStringLiteral("--restore-file-path") << opts.restorePath;
     } else {
-        args << job.hashcatArgs;
+        args << job.engineArgs;
         args << QStringLiteral("--session") << opts.sessionName;
         if (!opts.restorePath.isEmpty())
             args << QStringLiteral("--restore-file-path") << opts.restorePath;
@@ -50,7 +50,7 @@ QStringList HashcatExecutionBackend::composeArgs(const CrackingJob &job, const S
 
 QString HashcatExecutionBackend::programFor(const CrackingJob &job, const QString &configured)
 {
-    return job.hashcatPath.isEmpty() ? configured : job.hashcatPath;
+    return job.enginePath.isEmpty() ? configured : job.enginePath;
 }
 
 void HashcatExecutionBackend::launch(const QUuid &jobId, bool restore)

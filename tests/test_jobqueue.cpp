@@ -45,7 +45,7 @@ private:
         j.caseId = "case-1";
         j.evidenceId = QUuid::createUuid();
         j.hashMode = 13400;
-        j.hashcatArgs = {"-m", "13400", "-a", "0", "hash.txt", "wl.txt"};
+        j.engineArgs = {"-m", "13400", "-a", "0", "hash.txt", "wl.txt"};
         return j;
     }
 
