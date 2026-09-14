@@ -145,16 +145,46 @@ credentials.
 
 ## 8. Tool/version provenance
 
-- The hashcat version is probed (`hashcat --version`) and stored on each job;
-  the exact hashcat executable path and full argument vector are persisted.
+- The recovery engine is recorded on each job by a stable `engineId`
+  ("hashcat" / "john" / "bkcrack") together with its display name, the exact
+  argument vector, the resolved executable path, its version banner and a
+  best-effort SHA-256 of that executable.
 - Each extraction records the exact extractor program path and argv, and the
   extractor version where the tool reports one.
-- Reports surface the hashcat version, devices, exact parameters and extractor
+- Reports surface the engine, version, devices, exact parameters and extractor
   provenance so a report is self-describing about the toolchain that produced
-  the result.
+  the result — regardless of which engine ran.
+
+## 9. Engine-neutral records & backward compatibility
+
+- Job records are engine-neutral. The engine-specific fields carry engine-
+  neutral names (`engineArgs` / `enginePath` / `engineVersion`); records written
+  before the migration used the hashcat-only names (`hashcatArgs` /
+  `hashcatPath` / `hashcatVersion`), which are still read as a fallback, and a
+  record with no `engineId` is loaded as hashcat. Older cases therefore open
+  with full provenance and no data loss.
+- A recovered result records its `kind` (password vs. key material vs. …) and
+  the engine that produced it; a record with no `kind` loads as a password.
+  This keeps a bkcrack ZipCrypto internal-key result from being mislabelled as a
+  recovered password in the UI or a report.
+
+## 10. Dictionary provenance & drift
+
+- A Dictionary attack records the managed dictionary it used on the job and in
+  the report: the library id, display name, file path, SHA-256 and candidate
+  count.
+- Before a Dictionary recovery starts, the wordlist's integrity is checked
+  against the recorded SHA-256. A wordlist whose file is missing, or whose
+  SHA-256 no longer matches, is refused with a clear explanation rather than run
+  silently — so a result's dictionary provenance stays trustworthy. Built-in
+  wordlists whose baseline SHA-256 is not recorded are reported as "not
+  validated" rather than assumed unchanged. No wordlist/password data is
+  fabricated by the application.
 
 ## Test summary
 
-21 unit-test suites run offline with no external tools (a fake process runner
-stands in for hashcat/`*2john`). Real-tool interoperability is validated
-separately by the optional integration layer.
+The unit-test suites run offline with no external tools (a fake process runner
+stands in for hashcat/`*2john`), covering the invariants above — engine-neutral
+job/result records and legacy-field fallback, dictionary provenance and SHA-256
+drift detection included. Real-tool interoperability is validated separately by
+the optional integration layer.
