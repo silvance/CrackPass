@@ -59,6 +59,7 @@ private slots:
     void checkIntegrityDetectsModificationAndMissing();
     void removeImportedDeletesCopyButKeepsReferencedOriginal();
     void builtinCannotBeRemoved();
+    void revalidateRerecordsImportedBaseline();
     void defaultPrefersCaseKeyCommonWhenPresent();
     void buildsWhenBuiltinFilesAbsent();
 };
@@ -263,6 +264,46 @@ void TestDictionaryLibrary::builtinCannotBeRemoved()
     QVERIFY(!d.removeImported("casekey-common", &err));
     QVERIFY(!err.isEmpty());
     QVERIFY(d.contains("casekey-common"));      // still there
+}
+
+void TestDictionaryLibrary::revalidateRerecordsImportedBaseline()
+{
+    QTemporaryDir src, lib;
+    const QString wl = write(src.filePath("w.txt"), "one\ntwo\n");
+
+    DictionaryLibrary d;
+    d.setLibraryDir(lib.path());
+    QVERIFY(d.reload());
+    QString err;
+    const QString id = d.importWordlist(wl, "W", "", "", "", false, &err);
+    QVERIFY2(!id.isEmpty(), qPrintable(err));
+    QCOMPARE(d.entry(id).candidateCount, qint64(2));
+
+    // Modify the referenced file -> drift detected.
+    write(wl, "one\ntwo\nthree\nfour\n");
+    QCOMPARE(d.checkIntegrity(id), DictionaryLibrary::IntegrityStatus::Modified);
+
+    // Revalidate re-records the new baseline: integrity is Present again and the
+    // count reflects the new content.
+    qint64 count = -1;
+    QString sha;
+    QVERIFY2(d.revalidate(id, &count, &sha, &err), qPrintable(err));
+    QCOMPARE(count, qint64(4));
+    QCOMPARE(sha.size(), 64);
+    QCOMPARE(d.checkIntegrity(id), DictionaryLibrary::IntegrityStatus::Present);
+    QCOMPARE(d.entry(id).candidateCount, qint64(4));
+
+    // Persisted: a fresh library over the same dir sees the updated baseline.
+    DictionaryLibrary d2;
+    d2.setLibraryDir(lib.path());
+    QVERIFY(d2.reload());
+    QCOMPARE(d2.entry(id).candidateCount, qint64(4));
+    QCOMPARE(d2.entry(id).sha256, sha);
+
+    // Revalidating a missing file fails cleanly.
+    QFile::remove(wl);
+    QVERIFY(!d.revalidate(id, nullptr, nullptr, &err));
+    QVERIFY(!err.isEmpty());
 }
 
 void TestDictionaryLibrary::defaultPrefersCaseKeyCommonWhenPresent()

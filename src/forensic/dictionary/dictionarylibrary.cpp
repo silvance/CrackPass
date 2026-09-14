@@ -332,6 +332,52 @@ DictionaryLibrary::checkIntegrity(const QString &id, QString *currentSha256) con
     return current == e.sha256 ? IntegrityStatus::Present : IntegrityStatus::Modified;
 }
 
+bool DictionaryLibrary::revalidate(const QString &id, qint64 *candidateCountOut,
+                                   QString *sha256Out, QString *error)
+{
+    int idx = -1;
+    for (int i = 0; i < m_entries.size(); ++i) {
+        if (m_entries.at(i).id == id) {
+            idx = i;
+            break;
+        }
+    }
+    if (idx < 0) {
+        if (error) *error = QStringLiteral("No such dictionary: %1").arg(id);
+        return false;
+    }
+    DictionaryEntry &e = m_entries[idx];
+    if (!e.fileExists()) {
+        if (error) *error = QStringLiteral("The wordlist file is not present: %1").arg(e.absolutePath);
+        return false;
+    }
+
+    QString hashError;
+    const QString sha = HashingService::sha256File(e.absolutePath, &hashError);
+    if (sha.isEmpty()) {
+        if (error) *error = QStringLiteral("Could not hash %1: %2").arg(e.absolutePath, hashError);
+        return false;
+    }
+    const qint64 count = countCandidates(e.absolutePath, error);
+    if (count < 0)
+        return false; // *error already set
+    const qint64 size = QFileInfo(e.absolutePath).size();
+
+    if (sha256Out) *sha256Out = sha;
+    if (candidateCountOut) *candidateCountOut = count;
+
+    // Only an imported entry's baseline is writable; a builtin's lives in the
+    // read-only bundled manifest, so leave its recorded values untouched.
+    if (e.origin == DictionaryOrigin::Imported) {
+        e.sha256 = sha;
+        e.candidateCount = count;
+        e.sizeBytes = size;
+        if (!saveImported(error))
+            return false;
+    }
+    return true;
+}
+
 qint64 DictionaryLibrary::countCandidates(const QString &path, QString *error)
 {
     QFile f(path);

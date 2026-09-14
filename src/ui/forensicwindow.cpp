@@ -14,6 +14,7 @@
 #include "forensic/deps/toolchainservice.h"
 #include "attackplannerdialog.h"
 #include "recoverpassworddialog.h"
+#include "dictionarymanagerdialog.h"
 #include "forensic/dictionary/dictionarylibrary.h"
 #include "forensicsettingsdialog.h"
 #include "dependencydoctordialog.h"
@@ -180,6 +181,11 @@ ForensicWindow::ForensicWindow(QWidget *parent)
     m_bkcrackAction = new QAction(tr("ZipCrypto (bkcrack) Attack..."), this);
     m_bkcrackAction->setToolTip(tr("Known-plaintext attack (bkcrack) on a legacy ZipCrypto archive"));
     connect(m_bkcrackAction, &QAction::triggered, this, &ForensicWindow::zipCryptoAttackSelected);
+    // Managing the dictionary library is case-independent, so it is never gated
+    // by setCaseActionsEnabled().
+    m_dictionariesAction = new QAction(tr("Dictionaries…"), this);
+    m_dictionariesAction->setToolTip(tr("Manage the wordlist library used for Dictionary attacks"));
+    connect(m_dictionariesAction, &QAction::triggered, this, &ForensicWindow::openDictionaryManager);
 
     auto *advToolButton = new QToolButton(this);
     advToolButton->setText(tr("Advanced"));
@@ -424,6 +430,8 @@ QMenu *ForensicWindow::buildAdvancedMenu(QWidget *parent)
     menu->addSeparator();
     auto *specialized = menu->addMenu(tr("Specialized Recovery"));
     specialized->addAction(m_bkcrackAction);
+    menu->addSeparator();
+    menu->addAction(m_dictionariesAction);
     return menu;
 }
 
@@ -1223,6 +1231,15 @@ void ForensicWindow::openForensicSettings()
 void ForensicWindow::openDependencyDoctor()
 {
     DependencyDoctorDialog dlg(this);
+    dlg.exec();
+}
+
+void ForensicWindow::openDictionaryManager()
+{
+    // Build the library from the same locations the recovery workflow uses; the
+    // manager persists imports/removals/validations to the writable library dir,
+    // so the next recovery picks them up.
+    DictionaryManagerDialog dlg(makeDictionaryLibrary(), this);
     dlg.exec();
 }
 

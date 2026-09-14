@@ -164,6 +164,8 @@ add_executable(casekey WIN32
     src/ui/attackplannerdialog.cpp
     src/ui/recoverpassworddialog.h
     src/ui/recoverpassworddialog.cpp
+    src/ui/dictionarymanagerdialog.h
+    src/ui/dictionarymanagerdialog.cpp
     src/ui/bkcrackdialog.h
     src/ui/bkcrackdialog.cpp
     src/ui/forensicsettingsdialog.h

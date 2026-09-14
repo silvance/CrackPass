@@ -62,6 +62,7 @@ private slots:
     void generateReportForSelectedJob();
     void openForensicSettings();
     void openDependencyDoctor();
+    void openDictionaryManager();
     void copySelectedValue();
     void copySelectedTarget();
     void setRevealPasswords(bool on);
@@ -117,6 +118,7 @@ private:
     QAction *m_extractAction = nullptr;
     QAction *m_planAction = nullptr;
     QAction *m_bkcrackAction = nullptr;
+    QAction *m_dictionariesAction = nullptr; // manage the dictionary library (no case needed)
     QMenu *buildAdvancedMenu(QWidget *parent);
     QTableWidget *m_table = nullptr;
 
