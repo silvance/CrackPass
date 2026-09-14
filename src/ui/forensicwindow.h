@@ -17,10 +17,13 @@ class QTabWidget;
 
 namespace forensic {
 class CaseWorkspace;
+class DictionaryLibrary;
 class JobQueue;
 class JobExecutionBackend;
 class RecoveryController;
 struct CrackingJob;
+struct Extraction;
+struct EvidenceItem;
 struct RecoveredCredential;
 struct RecoveryStatus;
 }
@@ -44,6 +47,7 @@ private slots:
     void openCase();
     void addArtifact();
     void extractSelected();
+    void recoverPasswordSelected();
     void planAttackSelected();
     void zipCryptoAttackSelected();
 
@@ -67,6 +71,22 @@ private:
     void appendEvidenceRow(int row);
     void setCaseActionsEnabled(bool enabled);
     QString latestExtractionSummary(const QString &evidenceId) const;
+
+    // Ensure the artifact has a successful extraction with a selected hash mode,
+    // running extraction (and prompting for the mode) if needed. Returns true and
+    // fills the hash file + type name when ready; false (after explaining) if not.
+    bool ensureExtractedHash(const forensic::EvidenceItem &item,
+                             quint32 &modeOut, QString &hashFileOut, QString &hashTypeNameOut);
+    // Resolve the configured binary + version for an engine ("hashcat"/"john"),
+    // warning and returning false when the path is not configured.
+    bool resolveEngineTool(const QString &engineId, QString &toolPath, QString &toolVersion);
+    // Open the full guided planner for an already-extracted hash and queue what
+    // it plans. Shared by "Plan Attack…" and the wizard's Guided strategy.
+    void openAdvancedPlanner(const forensic::EvidenceItem &item, quint32 mode,
+                             const QString &hashTypeName, const QString &hashFile,
+                             const QString &planDir);
+    // Build the managed dictionary library (bundled manifest + user library dir).
+    forensic::DictionaryLibrary makeDictionaryLibrary() const;
 
     QWidget *buildEvidenceTab();
     QWidget *buildJobsTab();

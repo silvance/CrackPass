@@ -131,6 +131,8 @@ add_library(forensic_core STATIC
     src/forensic/recovery/recoveryengine.h
     src/forensic/recovery/recoveryengineregistry.h
     src/forensic/recovery/recoveryengineregistry.cpp
+    src/forensic/recovery/recoverystrategy.h
+    src/forensic/recovery/recoverystrategy.cpp
 )
 target_include_directories(forensic_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(forensic_core PUBLIC Qt6::Core)
@@ -160,6 +162,8 @@ add_executable(casekey WIN32
     src/ui/forensicwindow.cpp
     src/ui/attackplannerdialog.h
     src/ui/attackplannerdialog.cpp
+    src/ui/recoverpassworddialog.h
+    src/ui/recoverpassworddialog.cpp
     src/ui/bkcrackdialog.h
     src/ui/bkcrackdialog.cpp
     src/ui/forensicsettingsdialog.h

@@ -28,6 +28,14 @@ public:
 
     QList<const RecoveryEngine *> engines() const;
 
+    // Automatic engine choice for an attack: the default engine (hashcat) when
+    // it can express `spec`, otherwise the first registered engine that can.
+    // Returns nullptr when no engine can express the attack exactly (with
+    // *reasonIfNone set to why, taken from the default engine). Lets the UI
+    // offer "Automatic" without the examiner reasoning about engines.
+    const RecoveryEngine *selectForSpec(const AttackJobSpec &spec,
+                                        QString *reasonIfNone = nullptr) const;
+
     // The built-in engines. hashcat is always present and is the default.
     static RecoveryEngineRegistry withBuiltins();
     static QString defaultEngineId() { return QStringLiteral("hashcat"); }
