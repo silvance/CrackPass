@@ -40,6 +40,16 @@ jobs:
           Get-Content hashes.txt >> $env:GITHUB_STEP_SUMMARY
 
       # --- Normal mode: build, assemble the bundle, publish. ---
+      # Fail fast (in seconds, before the ~4-minute build) if the engine lockfile
+      # has not been bootstrapped, with an actionable message. Integrity is
+      # fail-closed: the bundle carries the recovery engines, so it cannot be built
+      # until every engine in tools/engines.lock.json has a verified sha256.
+      - name: Preflight — engine lockfile is bootstrapped
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.bootstrap_hashes) }}
+        shell: pwsh
+        run: |
+          python tools/fetch_engines.py --check
+
       - name: Set up MSYS2 with UCRT64
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.bootstrap_hashes) }}
         uses: msys2/setup-msys2@v2
