@@ -55,6 +55,7 @@ class TestRecoveryController : public QObject
 private slots:
     void queuesBuildsAndPersistsJob();
     void recoveredCredentialIsPersisted();
+    void credentialPersistenceFailureIsSurfaced();
     void noWorkspaceIsANoOp();
     void restoreJobsRehydratesPersistedJobsForResume();
     void refusesUnknownEngine();
@@ -126,6 +127,42 @@ void TestRecoveryController::recoveredCredentialIsPersisted()
     QCOMPARE(c.evidenceId, evidenceId);
     QCOMPARE(c.plaintext, QStringLiteral("hunter2"));
     QCOMPARE(c.rawPlaintext, QByteArray("hunter2"));
+}
+
+void TestRecoveryController::credentialPersistenceFailureIsSurfaced()
+{
+    QTemporaryDir dir;
+    auto ws = CaseWorkspace::create(dir.path(), CaseInfo{});
+    QVERIFY(ws);
+
+    FakeBackend backend;
+    JobQueue queue(&backend);
+    RecoveryController controller(&queue);
+    controller.setWorkspace(ws.get());
+
+    // Force the transactional recovered-credential write to fail deterministically
+    // on every platform: replace the case's `results` directory with a regular
+    // file, so writing results/recovered.json underneath it cannot succeed.
+    const QString resultsDir = QDir(ws->rootPath()).filePath(QStringLiteral("results"));
+    QVERIFY(QDir(resultsDir).removeRecursively());
+    { QFile f(resultsDir); QVERIFY(f.open(QIODevice::WriteOnly)); f.write("x"); }
+
+    // The in-memory recovered result must still be delivered for display...
+    QSignalSpy displayed(&queue, &JobQueue::credentialRecovered);
+    // ...while the case-persistence failure is surfaced explicitly.
+    QSignalSpy failed(&controller, &RecoveryController::credentialPersistenceFailed);
+
+    const QUuid jobId = controller.queueRecoveryJob(straightSpec(), QUuid::createUuid(),
+                                                    QStringLiteral("/tools/hashcat"));
+    QVERIFY(!jobId.isNull());
+    backend.fireCracked(jobId, QStringLiteral("$office$*hash"), QByteArray("Password1"));
+
+    QCOMPARE(displayed.size(), 1);            // recovery succeeded, result not discarded
+    QCOMPARE(failed.size(), 1);               // persistence failure surfaced
+    QVERIFY(ws->recoveredCredentials().isEmpty()); // no phantom credential recorded
+    // The surfaced error must not leak the recovered plaintext.
+    const QString err = failed.first().at(1).toString();
+    QVERIFY(!err.contains(QStringLiteral("Password1")));
 }
 
 void TestRecoveryController::noWorkspaceIsANoOp()

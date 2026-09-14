@@ -89,6 +89,16 @@ signals:
     // the on-disk record may be stale.
     void jobPersistenceFailed(const forensic::CrackingJob &job, const QString &error);
 
+    // Emitted when a credential was recovered by the engine but could NOT be
+    // recorded to the case (the transactional write was refused). Recovery
+    // genuinely succeeded and the in-memory result is still delivered for
+    // display via JobQueue::credentialRecovered, so it is NOT discarded -- but
+    // the case does NOT contain it, and the examiner must be told plainly so
+    // they never assume it was saved. `error` is a filesystem-level reason and
+    // never contains the recovered plaintext/key.
+    void credentialPersistenceFailed(const forensic::RecoveredCredential &cred,
+                                     const QString &error);
+
 protected:
     // Persist a freshly built job (atomic write + job_created audit) before it is
     // enqueued. Virtual so tests can inject a persistence failure.
