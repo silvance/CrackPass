@@ -27,6 +27,9 @@ private slots:
     void registerAndBuildArgsDispatch();
     void johnIsBuiltInAndReportsUnsupported();
     void hashcatSupportsEverythingByDefault();
+    void selectForSpecPrefersHashcat();
+    void selectForSpecFallsBackWhenHashcatAbsent();
+    void selectForSpecReturnsNullWhenNoEngineExpresses();
 };
 
 void TestRecoveryEngineRegistry::builtinsHaveHashcatAsDefault()
@@ -94,6 +97,61 @@ void TestRecoveryEngineRegistry::hashcatSupportsEverythingByDefault()
     ruled.wordlists = {QStringLiteral("wl.txt")};
     ruled.rules = {QStringLiteral("best64.rule")};
     QVERIFY(hc->unsupportedReason(ruled).isEmpty());
+}
+
+void TestRecoveryEngineRegistry::selectForSpecPrefersHashcat()
+{
+    const RecoveryEngineRegistry reg = RecoveryEngineRegistry::withBuiltins();
+    // A rule attack: only hashcat can express it, and it is preferred anyway.
+    AttackJobSpec ruled;
+    ruled.attackMode = AttackModeNum::Straight;
+    ruled.hashFile = QStringLiteral("h.txt");
+    ruled.wordlists = {QStringLiteral("wl.txt")};
+    ruled.rules = {QStringLiteral("best64.rule")};
+    const RecoveryEngine *chosen = reg.selectForSpec(ruled);
+    QVERIFY(chosen != nullptr);
+    QCOMPARE(chosen->id(), QStringLiteral("hashcat"));
+
+    // A plain wordlist attack both engines express -> hashcat still wins.
+    AttackJobSpec plain;
+    plain.attackMode = AttackModeNum::Straight;
+    plain.hashFile = QStringLiteral("h.txt");
+    plain.wordlists = {QStringLiteral("wl.txt")};
+    QCOMPARE(reg.selectForSpec(plain)->id(), QStringLiteral("hashcat"));
+}
+
+void TestRecoveryEngineRegistry::selectForSpecFallsBackWhenHashcatAbsent()
+{
+    // A registry with only John: a spec John can express selects John.
+    RecoveryEngineRegistry reg;
+    reg.registerEngine(std::make_shared<FakeEngine>()); // expresses everything
+    AttackJobSpec plain;
+    plain.attackMode = AttackModeNum::Straight;
+    plain.hashFile = QStringLiteral("h.txt");
+    plain.wordlists = {QStringLiteral("wl.txt")};
+    const RecoveryEngine *chosen = reg.selectForSpec(plain);
+    QVERIFY(chosen != nullptr);
+    QCOMPARE(chosen->id(), QStringLiteral("fake"));
+}
+
+void TestRecoveryEngineRegistry::selectForSpecReturnsNullWhenNoEngineExpresses()
+{
+    // A registry with only an always-refusing engine (no hashcat): selection
+    // returns nullptr and reports that engine's reason.
+    struct RefusingEngine : RecoveryEngine {
+        QString id() const override { return QStringLiteral("refuse"); }
+        QString displayName() const override { return QStringLiteral("Refusing"); }
+        QStringList buildArgs(const AttackJobSpec &) const override { return {}; }
+        QString unsupportedReason(const AttackJobSpec &) const override
+        {
+            return QStringLiteral("cannot express this attack");
+        }
+    };
+    RecoveryEngineRegistry only;
+    only.registerEngine(std::make_shared<RefusingEngine>());
+    QString reason;
+    QVERIFY(only.selectForSpec(AttackJobSpec{}, &reason) == nullptr);
+    QCOMPARE(reason, QStringLiteral("cannot express this attack"));
 }
 
 QTEST_GUILESS_MAIN(TestRecoveryEngineRegistry)

@@ -13,6 +13,8 @@
 #include "forensic/extraction/extraction.h"
 #include "forensic/deps/toolchainservice.h"
 #include "attackplannerdialog.h"
+#include "recoverpassworddialog.h"
+#include "forensic/dictionary/dictionarylibrary.h"
 #include "forensicsettingsdialog.h"
 #include "dependencydoctordialog.h"
 #include "forensic/crackingjob.h"
@@ -43,6 +45,8 @@
 #include <QMessageBox>
 #include <QProcess>
 #include <QPushButton>
+#include <QStandardPaths>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QTabWidget>
 #include <QTableWidget>
@@ -158,6 +162,9 @@ ForensicWindow::ForensicWindow(QWidget *parent)
     connect(toolbar->addAction(tr("Open Case...")), &QAction::triggered, this, &ForensicWindow::openCase);
     toolbar->addSeparator();
     connect(toolbar->addAction(tr("Add Artifact...")), &QAction::triggered, this, &ForensicWindow::addArtifact);
+    QAction *recoverAction = toolbar->addAction(tr("Recover Password..."));
+    recoverAction->setToolTip(tr("Recover the selected artifact's password (extracts the hash if needed)"));
+    connect(recoverAction, &QAction::triggered, this, &ForensicWindow::recoverPasswordSelected);
     connect(toolbar->addAction(tr("Extract Hash")), &QAction::triggered, this, &ForensicWindow::extractSelected);
     connect(toolbar->addAction(tr("Plan Attack...")), &QAction::triggered, this, &ForensicWindow::planAttackSelected);
     toolbar->addSeparator();
@@ -265,6 +272,11 @@ QWidget *ForensicWindow::buildEvidenceTab()
     m_addButton = new QPushButton(tr("Add Artifact..."), w);
     connect(m_addButton, &QPushButton::clicked, this, &ForensicWindow::addArtifact);
     buttonRow->addWidget(m_addButton);
+    auto *recoverButton = new QPushButton(tr("Recover Password..."), w);
+    recoverButton->setDefault(true);
+    recoverButton->setToolTip(tr("The primary workflow: extract the hash if needed, then run a recovery"));
+    connect(recoverButton, &QPushButton::clicked, this, &ForensicWindow::recoverPasswordSelected);
+    buttonRow->addWidget(recoverButton);
     m_extractButton = new QPushButton(tr("Extract Hash"), w);
     connect(m_extractButton, &QPushButton::clicked, this, &ForensicWindow::extractSelected);
     buttonRow->addWidget(m_extractButton);
@@ -538,6 +550,219 @@ void ForensicWindow::extractSelected()
                  r.hash));
 }
 
+bool ForensicWindow::ensureExtractedHash(const EvidenceItem &item, quint32 &modeOut,
+                                         QString &hashFileOut, QString &hashTypeNameOut)
+{
+    // A helper to locate the most recent successful extraction for this artifact
+    // with a resolved mode.
+    auto findReady = [&](forensic::Extraction &out) -> bool {
+        bool ok = false;
+        for (const auto &e : m_workspace->extractions())
+            if (e.evidenceId == item.id && e.status == QStringLiteral("success") && e.selectedMode != 0) {
+                out = e;
+                ok = true;
+            }
+        return ok;
+    };
+
+    forensic::Extraction chosen;
+    if (!findReady(chosen)) {
+        // No hash yet -- extract it now (the primary workflow auto-extracts).
+        if (!m_workspace->extractors().hasExtractorFor(item.type)) {
+            QMessageBox::information(
+                this, tr("Recover Password"),
+                tr("No hash extractor is available for detected type '%1', so its "
+                   "password cannot be recovered by this workflow.")
+                    .arg(item.type.isUnknown() ? tr("Unknown") : item.type.displayName));
+            return false;
+        }
+
+        forensic::QtProcessRunner runner;
+        forensic::ToolResolver tools = makeToolchainService(&runner).extractionResolver();
+        forensic::ExtractionContext ctx;
+        ctx.runner = &runner;
+        ctx.tools = &tools;
+        ctx.workingDir = QDir::tempPath();
+
+        QApplication::setOverrideCursor(Qt::WaitCursor);
+        auto outcome = m_workspace->extractHash(item.id, ctx);
+        QApplication::restoreOverrideCursor();
+
+        if (!outcome.ok) {
+            QMessageBox::warning(this, tr("Recover Password"), outcome.error);
+            return false;
+        }
+        const forensic::ExtractionResult &r = outcome.result;
+        if (r.status == forensic::ExtractionStatus::ToolUnavailable) {
+            QMessageBox::warning(this, tr("Extractor tool not configured"),
+                                 tr("%1\n\nConfigure the tool path under settings key 'tools/%2'.")
+                                     .arg(r.message, outcome.record.extractorId));
+            reloadEvidenceTable();
+            return false;
+        }
+        if (r.status != forensic::ExtractionStatus::Success) {
+            QString detail = r.message;
+            if (!r.stdErr.trimmed().isEmpty())
+                detail += tr("\n\nTool stderr:\n%1").arg(r.stdErr.trimmed());
+            QMessageBox::warning(this, tr("Extraction did not produce a hash"), detail);
+            reloadEvidenceTable();
+            return false;
+        }
+        // If the mode is ambiguous, ask -- we never silently guess.
+        if (r.modeAmbiguous()) {
+            QStringList options;
+            for (const auto &opt : r.candidateModes)
+                options << tr("%1 - %2").arg(opt.mode).arg(opt.name);
+            bool ok = false;
+            const QString choice = QInputDialog::getItem(
+                this, tr("Select hash type"),
+                tr("The extracted hash matches more than one type.\nSelect the correct one:"),
+                options, 0, false, &ok);
+            if (ok && !choice.isEmpty()) {
+                const quint32 mode = choice.section(QLatin1Char(' '), 0, 0).toUInt();
+                QString err;
+                if (!m_workspace->selectExtractionMode(outcome.record.id, mode, &err))
+                    QMessageBox::warning(this, tr("Select hash type"), err);
+            }
+        }
+        reloadEvidenceTable();
+
+        if (!findReady(chosen)) {
+            QMessageBox::information(
+                this, tr("Recover Password"),
+                tr("The hash was extracted but its type is not selected yet. "
+                   "Use 'Extract Hash' and choose a type, then try again."));
+            return false;
+        }
+    }
+
+    modeOut = chosen.selectedMode;
+    hashFileOut = QDir(m_workspace->extractionsDir())
+                      .filePath(chosen.id.toString(QUuid::WithoutBraces) + "/hash.txt");
+    hashTypeNameOut.clear();
+    for (const auto &opt : chosen.candidateModes)
+        if (opt.mode == chosen.selectedMode)
+            hashTypeNameOut = opt.name;
+    return true;
+}
+
+bool ForensicWindow::resolveEngineTool(const QString &engineId, QString &toolPath, QString &toolVersion)
+{
+    if (engineId == QStringLiteral("john")) {
+        toolPath = SettingsManager::instance().getKey<QString>("johnPath");
+        if (toolPath.isEmpty()) {
+            QMessageBox::warning(this, tr("Queue Attack"),
+                                 tr("Configure the John the Ripper path in Settings before "
+                                    "queuing a John job."));
+            return false;
+        }
+        toolVersion = probeJohnVersion(toolPath);
+    } else {
+        toolPath = SettingsManager::instance().getKey<QString>("hashcatPath");
+        if (toolPath.isEmpty()) {
+            QMessageBox::warning(this, tr("Queue Attack"),
+                                 tr("Configure the hashcat path in Settings before queuing a job."));
+            return false;
+        }
+        toolVersion = probeHashcatVersion(toolPath);
+    }
+    return true;
+}
+
+forensic::DictionaryLibrary ForensicWindow::makeDictionaryLibrary() const
+{
+    forensic::DictionaryLibrary lib;
+
+    // The bundled builtin manifest: a settings override, else next to the binary
+    // (a packaged install), else the source tree (a developer build).
+    const QString configured = SettingsManager::instance().getKey<QString>("dictionariesManifest");
+    QStringList candidates;
+    if (!configured.isEmpty())
+        candidates << configured;
+    const QString appDir = QApplication::applicationDirPath();
+    candidates << QDir(appDir).filePath(QStringLiteral("dictionaries/manifest.json"))
+               << QDir(appDir).filePath(QStringLiteral("../resources/dictionaries/manifest.json"))
+               << QDir(appDir).filePath(QStringLiteral("../../resources/dictionaries/manifest.json"))
+               << QDir(appDir).filePath(QStringLiteral("../share/casekey/dictionaries/manifest.json"));
+    for (const QString &c : candidates) {
+        if (QFileInfo::exists(c)) {
+            lib.setBuiltinManifest(QDir::cleanPath(c));
+            break;
+        }
+    }
+
+    // Imported entries and any copies live in a writable per-user library dir.
+    const QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (!dataDir.isEmpty())
+        lib.setLibraryDir(QDir(dataDir).filePath(QStringLiteral("dictionaries")));
+
+    lib.reload();
+    return lib;
+}
+
+void ForensicWindow::openAdvancedPlanner(const EvidenceItem &item, quint32 mode,
+                                         const QString &hashTypeName, const QString &hashFile,
+                                         const QString &planDir)
+{
+    AttackPlannerDialog dlg(mode, hashTypeName, hashFile, planDir, this);
+    dlg.exec();
+    if (!dlg.queueRequested())
+        return; // examiner only previewed; nothing is started
+
+    // Resolve the binary + version for the engine the examiner chose, so the
+    // recorded provenance matches the tool that actually runs.
+    QString toolPath, toolVersion;
+    if (!resolveEngineTool(dlg.plannedEngineId(), toolPath, toolVersion))
+        return;
+
+    // The controller builds the reproducible job, lays out its session files,
+    // enqueues it, and persists the record + later state/credentials. It refuses
+    // (via recoveryRefused) if the engine cannot express the attack.
+    m_recovery->queueRecoveryJob(dlg.plannedSpec(), item.id, toolPath, toolVersion, dlg.plannedEngineId());
+    m_tabs->setCurrentIndex(1); // show the Jobs tab
+}
+
+void ForensicWindow::recoverPasswordSelected()
+{
+    if (!m_workspace)
+        return;
+    const int row = m_table->currentRow();
+    if (row < 0 || row >= m_workspace->evidence().size()) {
+        QMessageBox::information(this, tr("Recover Password"), tr("Select an artifact first."));
+        return;
+    }
+    const EvidenceItem item = m_workspace->evidence().at(row);
+
+    quint32 mode = 0;
+    QString hashFile, hashTypeName;
+    if (!ensureExtractedHash(item, mode, hashFile, hashTypeName))
+        return; // reason already explained
+
+    const QString planDir = QDir(m_workspace->jobsDir())
+                                .filePath(QStringLiteral("plan-") + QUuid::createUuid().toString(QUuid::WithoutBraces));
+
+    const forensic::DictionaryLibrary library = makeDictionaryLibrary();
+    RecoverPasswordDialog dlg(mode, hashTypeName, hashFile, planDir, library,
+                              m_recovery->engines(), this);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    if (dlg.guidedRequested()) {
+        openAdvancedPlanner(item, mode, hashTypeName, hashFile, planDir);
+        return;
+    }
+    if (!dlg.startRequested())
+        return;
+
+    QString toolPath, toolVersion;
+    if (!resolveEngineTool(dlg.plannedEngineId(), toolPath, toolVersion))
+        return;
+
+    m_recovery->queueRecoveryJob(dlg.plannedSpec(), item.id, toolPath, toolVersion,
+                                 dlg.plannedEngineId());
+    m_tabs->setCurrentIndex(1); // show the Jobs tab
+}
+
 void ForensicWindow::planAttackSelected()
 {
     if (!m_workspace)
@@ -550,7 +775,8 @@ void ForensicWindow::planAttackSelected()
     const EvidenceItem item = m_workspace->evidence().at(row);
 
     // Find the most recent successful extraction for this artifact with a
-    // resolved hashcat mode.
+    // resolved hashcat mode. (Plan Attack requires the hash to exist already;
+    // the primary "Recover Password" workflow is the one that auto-extracts.)
     forensic::Extraction chosen;
     bool found = false;
     for (const auto &e : m_workspace->extractions()) {
@@ -577,39 +803,7 @@ void ForensicWindow::planAttackSelected()
     const QString planDir = QDir(m_workspace->jobsDir())
                                 .filePath(QStringLiteral("plan-") + QUuid::createUuid().toString(QUuid::WithoutBraces));
 
-    AttackPlannerDialog dlg(chosen.selectedMode, hashTypeName, hashFile, planDir, this);
-    dlg.exec();
-    if (!dlg.queueRequested())
-        return; // examiner only previewed; nothing is started
-
-    // Resolve the binary + version for the engine the examiner chose in the
-    // planner, so the recorded provenance matches the tool that actually runs.
-    const QString engineId = dlg.plannedEngineId();
-    QString toolPath, toolVersion;
-    if (engineId == QStringLiteral("john")) {
-        toolPath = SettingsManager::instance().getKey<QString>("johnPath");
-        if (toolPath.isEmpty()) {
-            QMessageBox::warning(this, tr("Queue Attack"),
-                                 tr("Configure the John the Ripper path in Settings before "
-                                    "queuing a John job."));
-            return;
-        }
-        toolVersion = probeJohnVersion(toolPath);
-    } else {
-        toolPath = SettingsManager::instance().getKey<QString>("hashcatPath");
-        if (toolPath.isEmpty()) {
-            QMessageBox::warning(this, tr("Queue Attack"),
-                                 tr("Configure the hashcat path in Settings before queuing a job."));
-            return;
-        }
-        toolVersion = probeHashcatVersion(toolPath);
-    }
-
-    // The controller builds the reproducible job, lays out its session files,
-    // enqueues it, and persists the record + later state/credentials. It refuses
-    // (via recoveryRefused) if the engine cannot express the attack.
-    m_recovery->queueRecoveryJob(dlg.plannedSpec(), item.id, toolPath, toolVersion, engineId);
-    m_tabs->setCurrentIndex(1); // show the Jobs tab
+    openAdvancedPlanner(item, chosen.selectedMode, hashTypeName, hashFile, planDir);
 }
 
 void ForensicWindow::zipCryptoAttackSelected()

@@ -67,6 +67,30 @@ QList<const RecoveryEngine *> RecoveryEngineRegistry::engines() const
     return out;
 }
 
+const RecoveryEngine *RecoveryEngineRegistry::selectForSpec(const AttackJobSpec &spec,
+                                                            QString *reasonIfNone) const
+{
+    // Prefer the default engine (hashcat) whenever it can express the attack.
+    if (const RecoveryEngine *d = find(defaultEngineId());
+        d && d->unsupportedReason(spec).isEmpty())
+        return d;
+    // Otherwise the first registered engine that can express it exactly.
+    for (const auto &e : m_engines)
+        if (e->unsupportedReason(spec).isEmpty())
+            return e.get();
+    if (reasonIfNone) {
+        // Explain why: the default engine's reason if it exists, else the first
+        // registered engine's reason, else that there is no engine at all.
+        if (const RecoveryEngine *d = find(defaultEngineId()))
+            *reasonIfNone = d->unsupportedReason(spec);
+        else if (!m_engines.isEmpty())
+            *reasonIfNone = m_engines.first()->unsupportedReason(spec);
+        else
+            *reasonIfNone = QStringLiteral("No recovery engine is available.");
+    }
+    return nullptr;
+}
+
 RecoveryEngineRegistry RecoveryEngineRegistry::withBuiltins()
 {
     RecoveryEngineRegistry registry;

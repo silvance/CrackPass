@@ -33,6 +33,7 @@ set(FORENSIC_TESTS
     test_toolchainservice
     test_recoverycontroller
     test_recoveryengineregistry
+    test_recoverystrategy
     test_dictionarylibrary
 )
 
