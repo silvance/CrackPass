@@ -93,6 +93,16 @@ public:
     // (empty if the file is missing).
     IntegrityStatus checkIntegrity(const QString &id, QString *currentSha256 = nullptr) const;
 
+    // Recompute an entry's SHA-256, candidate count and size from the file on
+    // disk and, for an IMPORTED entry, record them as the new baseline (so a
+    // deliberately updated wordlist is trusted again). A builtin's baseline
+    // lives in the read-only bundled manifest, so its recorded values are not
+    // changed -- the freshly computed values are returned via the out-params for
+    // display only. Returns false (with *error) when the file is missing/unreadable
+    // or persisting an imported entry failed.
+    bool revalidate(const QString &id, qint64 *candidateCountOut = nullptr,
+                    QString *sha256Out = nullptr, QString *error = nullptr);
+
     // Number of candidate lines (non-empty lines) in a wordlist file. Streams
     // the file read-only. Returns -1 on error (with *error set).
     static qint64 countCandidates(const QString &path, QString *error = nullptr);
