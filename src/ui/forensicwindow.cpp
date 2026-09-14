@@ -212,6 +212,21 @@ ForensicWindow::ForensicWindow(QWidget *parent)
                                      tr("A running job's state could not be saved to the case: %1")
                                          .arg(error));
             });
+    // A credential was recovered but could NOT be recorded to the case. Be
+    // explicit that recovery succeeded while recording failed, so the examiner
+    // never assumes the case holds a result it does not. The plaintext is shown
+    // in Results for this session but is not on disk; it is not included here.
+    connect(m_recovery, &forensic::RecoveryController::credentialPersistenceFailed, this,
+            [this](const forensic::RecoveredCredential &, const QString &error) {
+                QMessageBox::critical(
+                    this, tr("Recovery NOT recorded"),
+                    tr("A credential was recovered, but it could NOT be recorded to the "
+                       "case: %1\n\nThe result is shown in Results for this session only "
+                       "and is NOT saved to disk. Do not rely on the case containing it; "
+                       "resolve the storage problem and re-run, or record the result "
+                       "manually.")
+                        .arg(error));
+            });
     connect(m_queue, &JobQueue::jobChanged, this, &ForensicWindow::onJobChanged);
     connect(m_queue, &JobQueue::jobStatus, this, &ForensicWindow::onJobStatus);
     connect(m_queue, &JobQueue::credentialRecovered, this, &ForensicWindow::onCredentialRecovered);

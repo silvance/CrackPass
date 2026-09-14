@@ -29,8 +29,18 @@ RecoveryController::RecoveryController(JobQueue *queue, QObject *parent)
             emit jobPersistenceFailed(job, err);
     });
     connect(m_queue, &JobQueue::credentialRecovered, this, [this](const RecoveredCredential &cred) {
-        if (m_workspace)
-            m_workspace->addRecoveredCredential(cred);
+        if (!m_workspace)
+            return;
+        // The engine genuinely recovered the secret. Recording it to the case is
+        // a separate, transactional step that can fail. Do NOT swallow that
+        // failure: the case would then silently lack a credential the examiner
+        // believes was saved. The in-memory result is still delivered for
+        // display (JobQueue::credentialRecovered), so it is not lost; we only
+        // report that persistence did not happen. `err` is a filesystem-level
+        // reason -- never the recovered plaintext.
+        QString err;
+        if (!m_workspace->addRecoveredCredential(cred, &err))
+            emit credentialPersistenceFailed(cred, err);
     });
 }
 
