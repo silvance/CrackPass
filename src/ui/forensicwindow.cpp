@@ -511,8 +511,27 @@ void ForensicWindow::addArtifact()
     if (path.isEmpty())
         return;
 
+    // Let the examiner choose how the case holds the artifact. Referencing in
+    // place never touches the original; a working copy is an immutable import
+    // that survives the original moving or going offline. Either way the source
+    // file is never modified.
+    const QStringList options = {
+        tr("Reference in place — read the original where it is (never modified)"),
+        tr("Import a working copy — copy the file into the case and read only that copy"),
+    };
+    bool ok = false;
+    const QString choice = QInputDialog::getItem(
+        this, tr("Add Artifact"),
+        tr("How should this case hold the artifact?"),
+        options, 0, false, &ok);
+    if (!ok)
+        return;
+    const forensic::EvidenceStorageMode mode =
+        (choice == options.at(1)) ? forensic::EvidenceStorageMode::WorkingCopy
+                                  : forensic::EvidenceStorageMode::Referenced;
+
     QApplication::setOverrideCursor(Qt::WaitCursor);
-    forensic::IntakeResult result = m_workspace->addEvidence(path);
+    forensic::IntakeResult result = m_workspace->addEvidence(path, mode);
     QApplication::restoreOverrideCursor();
 
     if (!result.ok) {
