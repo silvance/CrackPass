@@ -54,6 +54,11 @@ private:
     };
 
     void launch(const QUuid &jobId, bool restore);
+    // Tear down and forget a job's context once it is terminal (no resume state
+    // needs to remain in the backend). Schedules the QProcess for deletion and
+    // frees the Context, so contexts do not accumulate across a session. Safe to
+    // call more than once (take() makes it a no-op after the first).
+    void disposeContext(const QUuid &jobId);
     void requestShutdown(const QUuid &jobId, Pending kind);
     static constexpr int kGraceMs = 10000; // grace before a forced kill
     void drainStatus(const QUuid &jobId);

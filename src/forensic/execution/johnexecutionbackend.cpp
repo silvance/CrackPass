@@ -171,21 +171,29 @@ void JohnExecutionBackend::launch(const QUuid &jobId, bool restore)
                 if (c->potTimer)
                     c->potTimer->stop();
                 const Pending pending = c->pending;
-                c->proc->deleteLater();
-                c->proc = nullptr;
                 if (pending == Pending::Pause) {
+                    // Resumable: keep the context, just release the process.
+                    c->proc->deleteLater();
+                    c->proc = nullptr;
                     emit paused(jobId);
                 } else if (pending == Pending::Stop) {
                     emit stopped(jobId);
+                    disposeContext(jobId); // terminal: no resume state to keep
                 } else {
                     // john has no status code; the queue decides Recovered vs
                     // Exhausted from whether a credential arrived and the exit code.
                     emit finished(jobId, exitCode, -1);
+                    disposeContext(jobId); // terminal
                 }
             });
+    // Report Running only on the actual started() signal, so a FailedToStart
+    // never transiently appears as Running.
+    connect(proc, &QProcess::started, this, [this, jobId] { emit running(jobId); });
     connect(proc, &QProcess::errorOccurred, this, [this, jobId](QProcess::ProcessError e) {
-        if (e == QProcess::FailedToStart)
+        if (e == QProcess::FailedToStart) {
             emit failed(jobId, QStringLiteral("Failed to start John the Ripper."));
+            disposeContext(jobId);
+        }
     });
 
     // Poll the pot file for recovered passwords; john appends to it as it cracks,
@@ -198,7 +206,23 @@ void JohnExecutionBackend::launch(const QUuid &jobId, bool restore)
     ctx->potTimer->start();
 
     proc->start(QIODevice::ReadOnly);
-    emit running(jobId);
+}
+
+void JohnExecutionBackend::disposeContext(const QUuid &jobId)
+{
+    Context *c = m_contexts.take(jobId);
+    if (!c)
+        return;
+    if (c->potTimer) {
+        c->potTimer->stop();
+        c->potTimer->deleteLater();
+        c->potTimer = nullptr;
+    }
+    if (c->proc) {
+        c->proc->deleteLater();
+        c->proc = nullptr;
+    }
+    delete c;
 }
 
 void JohnExecutionBackend::start(const CrackingJob &job, const StartOptions &opts)

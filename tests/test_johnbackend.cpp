@@ -24,6 +24,7 @@ private slots:
     void progressParsesGuessesAndSpeed();
     void progressScalesSpeedSuffix();
     void progressRejectsNonStatusLines();
+    void failedToStartEmitsOneFailureAndNeverRunning();
 };
 
 static CrackingJob johnJob()
@@ -135,6 +136,28 @@ void TestJohnBackend::progressRejectsNonStatusLines()
     QVERIFY(!JohnExecutionBackend::parseProgressLine(
         QStringLiteral("Loaded 1 password hash (PDF ...)"), st));
     QVERIFY(!JohnExecutionBackend::parseProgressLine(QString(), st));
+}
+
+void TestJohnBackend::failedToStartEmitsOneFailureAndNeverRunning()
+{
+    // A process that cannot start must produce exactly one clean failure and
+    // must NEVER transiently appear as Running (running is tied to the real
+    // QProcess::started signal, not emitted optimistically after start()).
+    JohnExecutionBackend backend(QStringLiteral("/nonexistent/definitely/not/here/john"));
+    CrackingJob j = johnJob();
+    j.enginePath = QStringLiteral("/nonexistent/definitely/not/here/john");
+
+    QSignalSpy running(&backend, SIGNAL(running(QUuid)));
+    QSignalSpy failed(&backend, SIGNAL(failed(QUuid, QString)));
+    QVERIFY(running.isValid());
+    QVERIFY(failed.isValid());
+
+    backend.start(j, opts(false));
+
+    QTRY_COMPARE_WITH_TIMEOUT(failed.count(), 1, 5000);
+    QCOMPARE(running.count(), 0); // never appeared Running
+    // The reported failure carries this job's id.
+    QCOMPARE(failed.first().at(0).toUuid(), j.id);
 }
 
 QTEST_GUILESS_MAIN(TestJohnBackend)
