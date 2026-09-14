@@ -35,6 +35,7 @@ set(FORENSIC_TESTS
     test_recoveryengineregistry
     test_recoverystrategy
     test_dictionarylibrary
+    test_officedictionaryslice
 )
 
 foreach(test_name ${FORENSIC_TESTS})
