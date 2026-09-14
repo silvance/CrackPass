@@ -17,8 +17,10 @@ Nothing here requires network access or a commercial license to run.
 
 | Component | Purpose | License | Notes |
 | --- | --- | --- | --- |
-| **hashcat** | Cracking engine | MIT | Path configured by the examiner; invoked with `--status-json`. Not redistributed by CaseKey by default. |
-| **John the Ripper Jumbo** — `office2john`, `pdf2john`, `zip2john`, `rar2john`, `7z2john`, `keepass2john` | Hash extraction from encrypted files/containers | GPL-2.0-or-later (with OpenSSL/other permissive parts) | Supplied on the workstation; each extraction records the exact tool + version used. |
+| **hashcat** | Primary cracking engine | MIT | Path configured by the examiner (or portable/PATH); invoked with `--status-json`. Not redistributed by CaseKey by default. |
+| **John the Ripper Jumbo** (`john`) | Second cracking engine | GPL-2.0-or-later (with OpenSSL/other permissive parts) | Supplied on the workstation; the resolved binary + version is recorded on each job. |
+| **John the Ripper Jumbo** — `office2john`, `pdf2john`, `zip2john`, `rar2john`, `7z2john`, `keepass2john`, `bitlocker2john` | Hash extraction from encrypted files/containers | GPL-2.0-or-later (with OpenSSL/other permissive parts) | Supplied on the workstation; each extraction records the exact tool + version used. |
+| **bkcrack** | ZipCrypto known-plaintext cryptanalysis (legacy ZIP only) | zlib | Supplied on the workstation; used only for traditional PKWARE ZipCrypto, never AES ZIPs. |
 
 ## Wordlists / dictionaries
 

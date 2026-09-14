@@ -16,10 +16,12 @@ continue on unverifiable state.
   / `integrity_check_failed` in the audit log.
 - Two storage modes are supported by the model:
   - **Referenced** (default): the original file is left in place.
-  - **WorkingCopy**: an immutable copy is imported into the case
+  - **WorkingCopy**: a **verified working copy** is imported into the case
     (`evidence/<id>/source.bin`), verified byte-for-byte against the source at
     import, and used for all later reads. Deleting the original then cannot
-    affect the case.
+    affect the case. The copy is **not** made technically immutable/read-only by
+    the application; integrity re-verification (above) *detects* any later
+    modification of the copy — which is different from *preventing* it.
 - Tests: `test_evidenceintegrity` (match, tamper-detection, extraction refusal
   on mismatch, unreadable-fails-loudly, working-copy read path).
 
@@ -121,15 +123,40 @@ supported **session/restore** mechanism and distinguishes:
   resumes explicitly.
 
 > Best-effort caveat (Windows): the console CTRL_BREAK path is inherently
-> best-effort. It temporarily attaches to the engine's console to raise the
-> event, and if any step fails (no console, attach denied) it falls back to
-> `terminate()` and then the forced kill — in which case the restore/session is
-> not guaranteed, exactly as on a forced termination. The engine must also honor
-> CTRL_BREAK (current hashcat and John Jumbo do). This path cannot be exercised
-> on the Linux CI runners, so it is validated **manually on Windows**: start a
-> long recovery, pause it, confirm the `.restore`/`.rec` session is written and
-> that resume continues rather than restarting. bkcrack has no checkpoint, so a
-> stop simply ends it and resume restarts from the beginning (stated plainly).
+> **best-effort**, never guaranteed. It temporarily attaches to the engine's
+> console to raise the event, and if any step fails (no console, attach denied)
+> it falls back to `terminate()` and then the forced kill — in which case the
+> restore/session is not guaranteed, exactly as on a forced termination. The
+> engine must also honor CTRL_BREAK (current hashcat and John Jumbo do).
+
+### Manual pause/resume validation (Windows) — not CI-covered
+
+The Windows checkpoint behaviour **cannot be exercised on the Linux CI runners**
+(and a console test harness cannot drive the CTRL_BREAK path either — see
+`test_processcontrol`), so it is validated **manually on a Windows workstation**.
+Do not read the automated suite as evidence that Windows checkpointing works.
+
+**hashcat**
+1. Start a job large enough to run for a while (e.g. a big wordlist, or a mask
+   with a wide keyspace) so it will not finish before you can pause it.
+2. Confirm progress advances (the status shows a rising done/percentage).
+3. **Pause** the job.
+4. Verify the `--session` restore file exists in the job directory and has
+   plausible, non-empty content/size (hashcat writes `<session>.restore`).
+5. **Resume** the job.
+6. Verify it continues from where it left off — progress resumes near the paused
+   position — rather than restarting from candidate zero.
+
+**John the Ripper** — perform the equivalent check against its `.rec` session:
+after Pause, confirm the `.rec` file exists with plausible content; after Resume
+(`--restore=<session>`), confirm it continues rather than restarting.
+
+**bkcrack** — bkcrack has **no session/checkpoint** support: a stop simply ends
+the process and a resume **restarts the attack from the beginning**. This is
+stated plainly rather than implying a checkpoint that does not exist.
+
+If a graceful signal does not take (the best-effort caveat above), the job falls
+through to the forced kill and no restore is guaranteed for that stop.
 
 ## 6. Persistence safety
 

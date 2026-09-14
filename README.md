@@ -31,8 +31,8 @@ Forensic Mode leads with one primary action — **Recover Password** — that ke
 implementation detail out of the way until you ask for it:
 
 1. **New / Open Case.**
-2. **Add Artifact** — reference the original in place, or import an immutable
-   working copy (your choice; the original is never modified).
+2. **Add Artifact** — reference the original in place, or import a verified
+   working copy (your choice; the original is never modified by CaseKey).
 3. **Recover Password** — CaseKey extracts the hash if needed, then offers a
    strategy: **Dictionary** (the recommended default; needs nothing known about
    the case), **Pattern** (a mask), or **Guided / advanced** (case knowledge and
