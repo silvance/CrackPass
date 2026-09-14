@@ -74,6 +74,9 @@ void HashcatExecutionBackend::launch(const QUuid &jobId, bool restore)
     proc->setArguments(composeArgs(ctx->job, ctx->opts));
 
     connect(proc, &QProcess::readyReadStandardOutput, this, [this, jobId] { drainStatus(jobId); });
+    // Report Running only when the process HAS started -- not optimistically
+    // after start() -- so a FailedToStart never transiently appears as Running.
+    connect(proc, &QProcess::started, this, [this, jobId] { emit running(jobId); });
     connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
             [this, jobId](int exitCode, QProcess::ExitStatus) {
                 Context *c = m_contexts.value(jobId);
@@ -82,23 +85,41 @@ void HashcatExecutionBackend::launch(const QUuid &jobId, bool restore)
                 drainCredentials(jobId); // capture any last-moment cracks
                 const Pending pending = c->pending;
                 const int statusCode = c->lastStatusCode;
-                c->proc->deleteLater();
-                c->proc = nullptr;
                 if (pending == Pending::Pause) {
+                    // Resumable: keep the context, just release the process.
+                    c->proc->deleteLater();
+                    c->proc = nullptr;
                     emit paused(jobId);
                 } else if (pending == Pending::Stop) {
                     emit stopped(jobId);
+                    disposeContext(jobId); // terminal: no resume state to keep
                 } else {
                     emit finished(jobId, exitCode, statusCode);
+                    disposeContext(jobId); // terminal
                 }
             });
     connect(proc, &QProcess::errorOccurred, this, [this, jobId](QProcess::ProcessError e) {
-        if (e == QProcess::FailedToStart)
+        if (e == QProcess::FailedToStart) {
+            // One clean failure transition; started() never fired, so no Running
+            // was emitted. Tear the context down so nothing leaks.
             emit failed(jobId, QStringLiteral("Failed to start hashcat."));
+            disposeContext(jobId);
+        }
     });
 
     proc->start(QIODevice::ReadOnly);
-    emit running(jobId);
+}
+
+void HashcatExecutionBackend::disposeContext(const QUuid &jobId)
+{
+    Context *c = m_contexts.take(jobId);
+    if (!c)
+        return;
+    if (c->proc) {
+        c->proc->deleteLater();
+        c->proc = nullptr;
+    }
+    delete c;
 }
 
 void HashcatExecutionBackend::start(const CrackingJob &job, const StartOptions &opts)

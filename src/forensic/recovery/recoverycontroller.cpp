@@ -29,19 +29,31 @@ RecoveryController::RecoveryController(JobQueue *queue, QObject *parent)
             emit jobPersistenceFailed(job, err);
     });
     connect(m_queue, &JobQueue::credentialRecovered, this, [this](const RecoveredCredential &cred) {
-        if (m_workspace)
-            m_workspace->addRecoveredCredential(cred);
+        if (!m_workspace)
+            return;
+        // The engine genuinely recovered the secret. Recording it to the case is
+        // a separate, transactional step that can fail. Do NOT swallow that
+        // failure: the case would then silently lack a credential the examiner
+        // believes was saved. The in-memory result is still delivered for
+        // display (JobQueue::credentialRecovered), so it is not lost; we only
+        // report that persistence did not happen. `err` is a filesystem-level
+        // reason -- never the recovered plaintext.
+        QString err;
+        if (!m_workspace->addRecoveredCredential(cred, &err))
+            emit credentialPersistenceFailed(cred, err);
     });
 }
 
 CrackingJob RecoveryController::buildJob(const RecoveryEngine &engine, const AttackJobSpec &spec,
                                          const QString &caseId, const QUuid &evidenceId,
-                                         const QString &toolPath, const QString &toolVersion)
+                                         const QString &toolPath, const QString &toolVersion,
+                                         const QUuid &extractionId)
 {
     CrackingJob job;
     job.id = QUuid::createUuid();
     job.caseId = caseId;
     job.evidenceId = evidenceId;
+    job.extractionId = extractionId;
     job.hashMode = spec.hashMode;
     job.attackMode = spec.attackMode;
     job.engineId = engine.id();
@@ -71,7 +83,8 @@ JobQueue::JobPaths RecoveryController::buildPaths(const QString &jobDir, const Q
 QUuid RecoveryController::queueRecoveryJob(const AttackJobSpec &spec, const QUuid &evidenceId,
                                            const QString &toolPath, const QString &toolVersion,
                                            const QString &engineId,
-                                           const DictionaryProvenance &dictionary)
+                                           const DictionaryProvenance &dictionary,
+                                           const QUuid &extractionId)
 {
     if (!m_workspace) {
         emit recoveryRefused(tr("No case is open."));
@@ -92,7 +105,7 @@ QUuid RecoveryController::queueRecoveryJob(const AttackJobSpec &spec, const QUui
     }
 
     CrackingJob job = buildJob(*engine, spec, m_workspace->info().id, evidenceId,
-                               toolPath, toolVersion);
+                               toolPath, toolVersion, extractionId);
     job.dictionary = dictionary; // provenance of the managed dictionary, if any
     return persistThenEnqueue(job);
 }

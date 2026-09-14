@@ -53,10 +53,13 @@ public:
     // `toolPath`/`toolVersion` record the resolved binary for provenance. As the
     // queue runs the job, state transitions and any recovered credential are
     // written to the case.
+    // `extractionId` binds the job to the exact Extraction whose hash it attacks
+    // (null when the attack does not come from a *2john extraction).
     QUuid queueRecoveryJob(const AttackJobSpec &spec, const QUuid &evidenceId,
                            const QString &toolPath, const QString &toolVersion = QString(),
                            const QString &engineId = RecoveryEngineRegistry::defaultEngineId(),
-                           const DictionaryProvenance &dictionary = DictionaryProvenance{});
+                           const DictionaryProvenance &dictionary = DictionaryProvenance{},
+                           const QUuid &extractionId = QUuid());
 
     // Build and enqueue a bkcrack (ZipCrypto known-plaintext) job from its own
     // spec, returning its id. bkcrack does not fit the hashcat-shaped
@@ -75,7 +78,8 @@ public:
     // Exposed for reuse/testing. The engine supplies the job's engineId and argv.
     static CrackingJob buildJob(const RecoveryEngine &engine, const AttackJobSpec &spec,
                                 const QString &caseId, const QUuid &evidenceId,
-                                const QString &toolPath, const QString &toolVersion);
+                                const QString &toolPath, const QString &toolVersion,
+                                const QUuid &extractionId = QUuid());
     static JobQueue::JobPaths buildPaths(const QString &jobDir, const QUuid &jobId);
 
 signals:
@@ -88,6 +92,16 @@ signals:
     // keeps running (the queue is not corrupted); the examiner is warned that
     // the on-disk record may be stale.
     void jobPersistenceFailed(const forensic::CrackingJob &job, const QString &error);
+
+    // Emitted when a credential was recovered by the engine but could NOT be
+    // recorded to the case (the transactional write was refused). Recovery
+    // genuinely succeeded and the in-memory result is still delivered for
+    // display via JobQueue::credentialRecovered, so it is NOT discarded -- but
+    // the case does NOT contain it, and the examiner must be told plainly so
+    // they never assume it was saved. `error` is a filesystem-level reason and
+    // never contains the recovered plaintext/key.
+    void credentialPersistenceFailed(const forensic::RecoveredCredential &cred,
+                                     const QString &error);
 
 protected:
     // Persist a freshly built job (atomic write + job_created audit) before it is

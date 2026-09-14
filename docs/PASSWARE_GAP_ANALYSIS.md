@@ -31,7 +31,11 @@ report already provide the extension points).
   fields).
 - **Batch enqueue** — plan+queue across many artifacts at once.
 - **Potfile reuse** — recognize already-recovered hashes and skip work.
-- **Bundled wordlist/rule library management** in the UI.
+- **Bundled rule-library management** in the UI. (Managed *dictionary/wordlist*
+  library management is **implemented** — a manifest-driven built-in library plus
+  imported entries with SHA-256/candidate-count provenance and drift detection,
+  managed under Settings → Dictionaries; rule-file library management is the
+  remaining piece.)
 
 ## Moderate
 Real engineering, but using established, documented techniques.

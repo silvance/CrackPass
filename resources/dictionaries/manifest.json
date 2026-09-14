@@ -1,12 +1,13 @@
 {
   "version": 1,
-  "comment": "Bundled dictionary manifest. It DECLARES the built-in wordlists CaseKey ships with; it never contains password data itself. Each 'path' is resolved relative to this manifest's directory. The wordlist files are supplied separately (see README.md in this directory) and may be absent in a source checkout, in which case CaseKey shows the entry as 'file not supplied' and never fabricates candidates.",
+  "comment": "Bundled dictionary manifest. It DECLARES the built-in wordlists CaseKey ships with; it never contains password data itself. Each 'path' is resolved relative to this manifest's directory. The wordlist files are supplied separately (see README.md in this directory) and may be absent in a source checkout, in which case CaseKey shows the entry as 'file not supplied' and never fabricates candidates. 'required' (default false) is a RELEASE-PACKAGING flag only: when true, tools/check_release_dictionaries.py fails the release if the file was not provisioned. It does not change runtime behaviour.",
   "dictionaries": [
     {
       "id": "casekey-common",
       "displayName": "CaseKey Common",
       "description": "A general-purpose wordlist for the default Dictionary attack. A broad set of common passwords and passphrases; a sensible first pass that requires no knowledge of the specific case.",
       "path": "casekey-common.txt",
+      "required": false,
       "candidateCount": -1,
       "sizeBytes": -1,
       "sha256": "",
@@ -18,6 +19,7 @@
       "displayName": "CaseKey Quick",
       "description": "A small, fast wordlist for a quick triage pass: the most common passwords only. Finishes in seconds and requires no case knowledge.",
       "path": "casekey-quick.txt",
+      "required": false,
       "candidateCount": -1,
       "sizeBytes": -1,
       "sha256": "",

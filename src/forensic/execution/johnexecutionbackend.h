@@ -70,6 +70,9 @@ private:
     };
 
     void launch(const QUuid &jobId, bool restore);
+    // Tear down and forget a terminal job's context (process + pot-poll timer),
+    // so nothing accumulates across a session. Safe to call more than once.
+    void disposeContext(const QUuid &jobId);
     void requestShutdown(const QUuid &jobId, Pending kind);
     void drainStderr(const QUuid &jobId);
     void drainCredentials(const QUuid &jobId);
