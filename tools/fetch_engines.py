@@ -11,6 +11,7 @@
 # so an unverified third-party binary never ships in a forensic tool.
 #
 # Usage:
+#   python tools/fetch_engines.py --check                    # verify the lockfile is bootstrapped (no download)
 #   python tools/fetch_engines.py --dest <bundle-dir>        # download, verify, lay out
 #   python tools/fetch_engines.py --print-hashes             # download + print sha256 only
 #   python tools/fetch_engines.py --dest <d> --only bkcrack  # a subset
@@ -53,6 +54,44 @@ def sha256_file(path):
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def normalized_sha256(engine):
+    """Return the engine's lower-cased sha256 if it is a valid 64-hex digest, else None."""
+    want = (engine.get("sha256") or "").strip().lower()
+    if len(want) == 64 and all(c in "0123456789abcdef" for c in want):
+        return want
+    return None
+
+
+def do_check(lock, only):
+    """Fail-closed preflight: confirm every (selected) engine carries a valid sha256.
+
+    Downloads nothing. Used at the start of the release workflow so a lockfile that
+    has not been bootstrapped fails in seconds with an actionable message, instead of
+    after a full build. Exit 0 when the lockfile is ready to bundle, 2 otherwise.
+    """
+    unlocked = [e["id"] for e in lock["engines"]
+                if not (only and e["id"] not in only) and normalized_sha256(e) is None]
+    if unlocked:
+        print("ERROR: the engine lockfile is not bootstrapped; the full bundle cannot be built.",
+              file=sys.stderr)
+        print(f"  missing a valid sha256 for: {', '.join(unlocked)}", file=sys.stderr)
+        print("  Integrity is fail-closed: CaseKey never ships an unverified third-party binary.",
+              file=sys.stderr)
+        print("  To fix (once, on a networked machine or via this workflow):", file=sys.stderr)
+        print("    1. Run this workflow with 'bootstrap_hashes = true' (Actions -> Run workflow),",
+              file=sys.stderr)
+        print("       or run: python tools/fetch_engines.py --print-hashes", file=sys.stderr)
+        print("    2. Confirm each 'url'/'version' in tools/engines.lock.json is the intended",
+              file=sys.stderr)
+        print("       official artifact, then paste the printed digests into the 'sha256' fields.",
+              file=sys.stderr)
+        print("    3. Commit engines.lock.json and re-run this workflow to publish the bundle.",
+              file=sys.stderr)
+        return 2
+    print("OK: every bundled engine has a valid sha256; the lockfile is ready to bundle.")
+    return 0
 
 
 def extract(archive_path, kind, out_dir):
@@ -125,8 +164,8 @@ def do_bundle(lock, dest, only):
     for e in lock["engines"]:
         if only and e["id"] not in only:
             continue
-        want = (e.get("sha256") or "").strip().lower()
-        if len(want) != 64 or any(c not in "0123456789abcdef" for c in want):
+        want = normalized_sha256(e)
+        if want is None:
             print(f"ERROR: {e['id']} has no valid sha256 in engines.lock.json; refusing to "
                   f"bundle an unverified binary. Run --print-hashes and commit the digest.",
                   file=sys.stderr)
@@ -189,6 +228,9 @@ def main():
     ap.add_argument("--dest", help="bundle root directory to populate")
     ap.add_argument("--print-hashes", action="store_true",
                     help="download each source and print its sha256, then exit")
+    ap.add_argument("--check", action="store_true",
+                    help="verify the lockfile is bootstrapped (valid sha256 for every engine) "
+                         "without downloading, then exit")
     ap.add_argument("--only", nargs="*", default=None,
                     help="restrict to these engine ids (default: all)")
     args = ap.parse_args()
@@ -196,6 +238,8 @@ def main():
     lock = load_lock()
     only = set(args.only) if args.only else None
 
+    if args.check:
+        return do_check(lock, only)
     if args.print_hashes:
         return do_print_hashes(lock, only)
     if not args.dest:
