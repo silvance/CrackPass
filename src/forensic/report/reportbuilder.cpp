@@ -58,6 +58,15 @@ RecoveryReport ReportBuilder::build(const CaseWorkspace &ws, const CrackingJob &
     r.mask = job.mask;
     r.engineArgs = job.engineArgs;
 
+    // Managed dictionary used (Dictionary attack only).
+    if (job.dictionary.isSet()) {
+        r.dictionaryId = job.dictionary.id;
+        r.dictionaryName = job.dictionary.displayName;
+        r.dictionaryPath = job.dictionary.path;
+        r.dictionarySha256 = job.dictionary.sha256;
+        r.dictionaryCandidateCount = job.dictionary.candidateCount;
+    }
+
     // Recovery engine environment (engine-neutral: hashcat / John / bkcrack).
     r.engineId = job.engineId;
     r.engineDisplayName = job.engineDisplayName.isEmpty() ? job.engineId : job.engineDisplayName;

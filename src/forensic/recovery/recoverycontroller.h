@@ -55,7 +55,8 @@ public:
     // written to the case.
     QUuid queueRecoveryJob(const AttackJobSpec &spec, const QUuid &evidenceId,
                            const QString &toolPath, const QString &toolVersion = QString(),
-                           const QString &engineId = RecoveryEngineRegistry::defaultEngineId());
+                           const QString &engineId = RecoveryEngineRegistry::defaultEngineId(),
+                           const DictionaryProvenance &dictionary = DictionaryProvenance{});
 
     // Build and enqueue a bkcrack (ZipCrypto known-plaintext) job from its own
     // spec, returning its id. bkcrack does not fit the hashcat-shaped

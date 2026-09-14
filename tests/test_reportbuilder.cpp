@@ -30,6 +30,7 @@ private:
 private slots:
     void buildsFullReportWithRecovery();
     void jsonAndHtmlContainKeyFields();
+    void reportCarriesDictionaryProvenance();
     void redactionHidesPlaintext();
 };
 
@@ -62,6 +63,11 @@ static void seedCase(CaseWorkspace *ws, QTemporaryDir &src, QUuid &jobIdOut)
     job.wordlists = {"rockyou.txt"};
     job.rules = {"best64.rule"};
     job.engineArgs = {"-m", "10500", "-a", "0", "hash.txt", "rockyou.txt", "-r", "best64.rule"};
+    job.dictionary.id = "casekey-common";
+    job.dictionary.displayName = "CaseKey Common";
+    job.dictionary.path = "/dicts/casekey-common.txt";
+    job.dictionary.sha256 = QString(64, QLatin1Char('d'));
+    job.dictionary.candidateCount = 12345;
     job.startedUtc = QDateTime::currentDateTimeUtc();
     job.endedUtc = job.startedUtc.addSecs(42);
     job.state = JobState::Recovered;
@@ -130,6 +136,29 @@ void TestReportBuilder::jsonAndHtmlContainKeyFields()
     QVERIFY(html.contains("Recovery engine")); // engine-neutral section, not "Hashcat environment"
 }
 
+
+void TestReportBuilder::reportCarriesDictionaryProvenance()
+{
+    QTemporaryDir caseDir, src;
+    auto ws = CaseWorkspace::create(caseDir.path(), CaseInfo{});
+    QVERIFY(ws);
+    QUuid jobId;
+    seedCase(ws.get(), src, jobId);
+    const RecoveryReport r = ReportBuilder::build(*ws, ws->jobs().first(), "0.7.1");
+
+    QCOMPARE(r.dictionaryId, QStringLiteral("casekey-common"));
+    QCOMPARE(r.dictionaryName, QStringLiteral("CaseKey Common"));
+    QCOMPARE(r.dictionaryCandidateCount, qint64(12345));
+
+    const QJsonObject o = QJsonDocument::fromJson(ReportRenderer::toJson(r)).object();
+    const QJsonObject dict = o.value("attack").toObject().value("dictionary").toObject();
+    QCOMPARE(dict.value("id").toString(), QStringLiteral("casekey-common"));
+    QCOMPARE(dict.value("sha256").toString().size(), 64);
+
+    const QString html = ReportRenderer::toHtml(r);
+    QVERIFY(html.contains("CaseKey Common"));
+    QVERIFY(html.contains("Dictionary SHA-256"));
+}
 
 void TestReportBuilder::redactionHidesPlaintext()
 {

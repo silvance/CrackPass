@@ -73,6 +73,14 @@ QString ReportRenderer::toHtml(const RecoveryReport &report)
     h += row(QStringLiteral("Hash mode"), QStringLiteral("-m %1 (%2)").arg(report.hashMode).arg(report.hashModeName));
     h += row(QStringLiteral("Attack strategy"), QStringLiteral("-a %1 (%2)").arg(report.attackMode).arg(report.attackStrategy));
     h += row(QStringLiteral("Wordlists"), report.wordlists.join(QStringLiteral(", ")));
+    if (!report.dictionaryId.isEmpty()) {
+        const QString count = report.dictionaryCandidateCount >= 0
+            ? QString::number(report.dictionaryCandidateCount)
+            : QStringLiteral("(not recorded)");
+        h += row(QStringLiteral("Dictionary"),
+                 QStringLiteral("%1 (%2 candidates)").arg(report.dictionaryName, count));
+        h += row(QStringLiteral("Dictionary SHA-256"), report.dictionarySha256);
+    }
     h += row(QStringLiteral("Rules"), report.rules.join(QStringLiteral(", ")));
     h += row(QStringLiteral("Mask"), report.mask);
     h += QStringLiteral("<tr><th>Exact parameters</th><td><code>%1</code></td></tr>")

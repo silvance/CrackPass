@@ -39,6 +39,15 @@ QJsonObject RecoveryReport::toJson() const
     attack[QStringLiteral("rules")] = arr(rules);
     attack[QStringLiteral("mask")] = mask;
     attack[QStringLiteral("engineArgs")] = arr(engineArgs);
+    if (!dictionaryId.isEmpty()) {
+        QJsonObject dict;
+        dict[QStringLiteral("id")] = dictionaryId;
+        dict[QStringLiteral("name")] = dictionaryName;
+        dict[QStringLiteral("path")] = dictionaryPath;
+        dict[QStringLiteral("sha256")] = dictionarySha256;
+        dict[QStringLiteral("candidateCount")] = static_cast<double>(dictionaryCandidateCount);
+        attack[QStringLiteral("dictionary")] = dict;
+    }
 
     QJsonObject env;
     env[QStringLiteral("engineId")] = engineId;

@@ -4,9 +4,11 @@
  */
 #include "recoverpassworddialog.h"
 
+#include "forensic/hashingservice.h"
 #include "forensic/planner/attackplanner.h"
 #include "forensic/planner/knowledgematerializer.h"
 
+#include <QApplication>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
@@ -15,6 +17,7 @@
 #include <QLineEdit>
 #include <QLocale>
 #include <QPlainTextEdit>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QStackedWidget>
 #include <QToolButton>
@@ -227,6 +230,7 @@ void RecoverPasswordDialog::replan()
     m_spec = AttackJobSpec{};
     m_engineId.clear();
     m_dictionaryId.clear();
+    m_dictionaryProvenance = forensic::DictionaryProvenance{};
     m_command->clear();
     m_details->clear();
 
@@ -262,10 +266,18 @@ void RecoverPasswordDialog::replan()
                 ctx.commonWordlist = entry.absolutePath;
                 const PlanResult r = AttackPlanner().plan(AttackTemplate::CommonPasswords,
                                                           CaseKnowledge{}, ctx);
-                if (!r.ok)
+                if (!r.ok) {
                     problem = r.error;
-                else
+                } else {
                     m_spec = r.spec;
+                    // Record which dictionary was used (SHA-256 refreshed at Start
+                    // once the drift check has run).
+                    m_dictionaryProvenance.id = entry.id;
+                    m_dictionaryProvenance.displayName = entry.displayName;
+                    m_dictionaryProvenance.path = entry.absolutePath;
+                    m_dictionaryProvenance.sha256 = entry.sha256;
+                    m_dictionaryProvenance.candidateCount = entry.candidateCount;
+                }
             }
         }
     } else { // Mask
@@ -344,6 +356,39 @@ void RecoverPasswordDialog::onPrimaryClicked()
     }
     if (!m_planOk)
         return;
+
+    // For a Dictionary attack, verify the wordlist's integrity once, at Start
+    // (not on every keystroke). Refuse if it has changed from the recorded
+    // SHA-256 -- a silently edited wordlist invalidates the recorded provenance.
+    if (currentStrategy() == RecoveryStrategy::Dictionary && !m_dictionaryId.isEmpty()) {
+        QApplication::setOverrideCursor(Qt::WaitCursor);
+        QString currentSha;
+        const DictionaryLibrary::IntegrityStatus status =
+            m_library.checkIntegrity(m_dictionaryId, &currentSha);
+        QApplication::restoreOverrideCursor();
+
+        if (status == DictionaryLibrary::IntegrityStatus::Missing) {
+            QMessageBox::warning(this, tr("Dictionary unavailable"),
+                                 tr("The wordlist file is no longer present. Choose another "
+                                    "dictionary or supply the file, then try again."));
+            replan();
+            return;
+        }
+        if (status == DictionaryLibrary::IntegrityStatus::Modified) {
+            QMessageBox::warning(
+                this, tr("Dictionary changed"),
+                tr("The wordlist file has changed since it was recorded (its SHA-256 no "
+                   "longer matches). Recovery is refused so the result's provenance stays "
+                   "trustworthy.\n\nRestore the original file, or re-validate this dictionary "
+                   "in the Dictionary Manager to record its new digest."));
+            return;
+        }
+        // Present or Unverifiable (a builtin with no recorded baseline): record
+        // the digest of the file actually used.
+        if (!currentSha.isEmpty())
+            m_dictionaryProvenance.sha256 = currentSha;
+    }
+
     m_startRequested = true;
     accept();
 }

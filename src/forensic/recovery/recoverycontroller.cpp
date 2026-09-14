@@ -70,7 +70,8 @@ JobQueue::JobPaths RecoveryController::buildPaths(const QString &jobDir, const Q
 
 QUuid RecoveryController::queueRecoveryJob(const AttackJobSpec &spec, const QUuid &evidenceId,
                                            const QString &toolPath, const QString &toolVersion,
-                                           const QString &engineId)
+                                           const QString &engineId,
+                                           const DictionaryProvenance &dictionary)
 {
     if (!m_workspace) {
         emit recoveryRefused(tr("No case is open."));
@@ -90,8 +91,9 @@ QUuid RecoveryController::queueRecoveryJob(const AttackJobSpec &spec, const QUui
         return QUuid();
     }
 
-    const CrackingJob job = buildJob(*engine, spec, m_workspace->info().id, evidenceId,
-                                     toolPath, toolVersion);
+    CrackingJob job = buildJob(*engine, spec, m_workspace->info().id, evidenceId,
+                               toolPath, toolVersion);
+    job.dictionary = dictionary; // provenance of the managed dictionary, if any
     return persistThenEnqueue(job);
 }
 
