@@ -30,6 +30,33 @@ public:
     // only resolution is needed); `appDir` and `settings` mirror DependencyProbe.
     ToolchainService(ProcessRunner *runner, QString appDir, DependencyProbe::SettingLookup settings);
 
+    // The authoritative resolution of a recovery ENGINE (hashcat / john /
+    // bkcrack): the executable actually launched, its version banner and a
+    // SHA-256 of that executable. Same resolution order as everything else
+    // (settings override -> bundled portable layout -> PATH). This is the single
+    // place engine paths/versions are resolved, so what a job records and what
+    // the Dependency Doctor reports cannot drift from what runs.
+    struct ResolvedEngine
+    {
+        QString engineId;
+        bool available = false;
+        QString path;     // resolved executable
+        QString version;  // best-effort version/banner (may be empty)
+        QString sha256;   // SHA-256 of the executable (empty if unreadable)
+        QString reason;   // why unavailable, when !available
+    };
+    ResolvedEngine resolveEngine(const QString &engineId) const;
+
+    // Just the resolved executable path for an engine (no version probe, no
+    // hashing, no process launched) -- used to construct the execution backend
+    // at startup with the SAME resolution the provenance path uses, so the two
+    // cannot diverge. Empty when the engine is not found.
+    QString resolveEnginePath(const QString &engineId) const;
+
+    // The settings key holding an engine's configured path, or empty for an
+    // unknown engine id.
+    static QString engineSettingsKey(const QString &engineId);
+
     // Full health report for the Dependency Doctor.
     DependencyReport report() const;
 
