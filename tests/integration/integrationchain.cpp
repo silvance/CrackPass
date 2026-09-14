@@ -8,13 +8,18 @@
 #include "forensic/extraction/processrunner.h"
 #include "forensic/extraction/toolresolver.h"
 #include "forensic/execution/hashcatexecutionbackend.h"
+#include "forensic/execution/johnexecutionbackend.h"
+#include "forensic/execution/bkcrackexecutionbackend.h"
+#include "forensic/execution/jobexecutionbackend.h"
 #include "forensic/execution/jobqueue.h"
 #include "forensic/recovery/recoverycontroller.h"
+#include "forensic/bkcrack/bkcrackattackspec.h"
 #include "forensic/planner/attackcommandbuilder.h"
 #include "forensic/planner/attackjobspec.h"
 #include "forensic/report/reportbuilder.h"
 #include "forensic/report/reportrenderer.h"
 
+#include <memory>
 #include <QDir>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -34,18 +39,31 @@ QString extractorForType(const QString &t)
     if (t == QStringLiteral("rar"))          return QStringLiteral("rar2john");
     if (t == QStringLiteral("7z"))           return QStringLiteral("7z2john");
     if (t == QStringLiteral("keepass-kdbx")) return QStringLiteral("keepass2john");
+    if (t == QStringLiteral("bitlocker"))    return QStringLiteral("bitlocker2john");
     return QString();
 }
 
 namespace {
 
-// Drives the real JobQueue + hashcat backend for one mode, returning the
-// recovered plaintext (empty if not recovered within the timeout).
-QString crackOnce(const IntegrationEnv &env, CaseWorkspace &ws, const EvidenceItem &item,
-                  const QString &hashFile, quint32 mode, const QString &wordlist, int timeoutMs)
+// Drives the real JobQueue + the chosen engine's backend for one mode,
+// returning the recovered plaintext (empty if not recovered within the
+// timeout). engineId is "hashcat" or "john".
+QString crackOnce(const QString &engineId, const QString &program, CaseWorkspace &ws,
+                  const EvidenceItem &item, const QString &hashFile, quint32 mode,
+                  const QString &wordlist, int timeoutMs)
 {
-    HashcatExecutionBackend backend(env.hashcat.program);
-    JobQueue queue(&backend);
+    std::unique_ptr<JobExecutionBackend> backend;
+    if (engineId == QStringLiteral("john"))
+        backend = std::make_unique<JohnExecutionBackend>(program);
+    else
+        backend = std::make_unique<HashcatExecutionBackend>(program);
+
+    JobQueue queue(backend.get());
+    // A non-default engine must be registered so the fail-closed queue routes to
+    // it (the default backend serves "hashcat"/empty).
+    if (engineId != QStringLiteral("hashcat") && !engineId.isEmpty())
+        queue.registerBackend(engineId, backend.get());
+
     // Drive recovery through the same controller the GUI uses: it builds the
     // job, enqueues it, and persists the job record + recovered credential.
     RecoveryController controller(&queue);
@@ -71,7 +89,7 @@ QString crackOnce(const IntegrationEnv &env, CaseWorkspace &ws, const EvidenceIt
     });
     QTimer::singleShot(timeoutMs, &loop, [&] { loop.quit(); });
 
-    jobId = controller.queueRecoveryJob(spec, item.id, env.hashcat.program);
+    jobId = controller.queueRecoveryJob(spec, item.id, program, QString(), engineId);
     loop.exec();
 
     return recovered;
@@ -80,7 +98,8 @@ QString crackOnce(const IntegrationEnv &env, CaseWorkspace &ws, const EvidenceIt
 } // namespace
 
 ChainResult runChain(const IntegrationEnv &env, const QString &caseParentDir,
-                     const FixtureSpec &fixture, const QString &extractorToolId, int hashcatTimeoutMs)
+                     const FixtureSpec &fixture, const QString &extractorToolId,
+                     const QString &engineId, int recoveryTimeoutMs)
 {
     ChainResult r;
 
@@ -151,13 +170,23 @@ ChainResult runChain(const IntegrationEnv &env, const QString &caseParentDir,
     const QString hashFile = QDir(ws->extractionsDir())
         .filePath(outcome.record.id.toString(QUuid::WithoutBraces) + "/hash.txt");
 
-    r.stage = QStringLiteral("hashcat-recovery");
-    // Try each candidate mode until one recovers (handles ambiguous families).
-    for (quint32 mode : modes) {
-        const QString rec = crackOnce(env, *ws, item, hashFile, mode, wl, hashcatTimeoutMs / modes.size());
+    r.stage = QStringLiteral("recovery");
+    const QString program = engineId == QStringLiteral("john") ? env.john.program
+                                                               : env.hashcat.program;
+    // hashcat needs the right -m mode, so try each candidate; John auto-detects
+    // the format from the hash, so one pass suffices.
+    const QVector<quint32> tryModes = engineId == QStringLiteral("john")
+        ? QVector<quint32>{modes.first()}
+        : modes;
+    for (quint32 mode : tryModes) {
+        const QString rec = crackOnce(engineId, program, *ws, item, hashFile, mode, wl,
+                                      recoveryTimeoutMs / tryModes.size());
         if (!rec.isEmpty()) { r.recovered = rec; r.modeUsed = mode; break; }
     }
-    if (r.recovered.isEmpty()) { r.message = QStringLiteral("hashcat did not recover the password"); return r; }
+    if (r.recovered.isEmpty()) {
+        r.message = QStringLiteral("%1 did not recover the password").arg(engineId);
+        return r;
+    }
     if (r.recovered != fixture.expectedPassword) {
         r.message = QStringLiteral("recovered '%1' != expected '%2'").arg(r.recovered, fixture.expectedPassword);
         return r;
@@ -202,6 +231,94 @@ QVector<FixtureSpec> loadCorpus(const QString &dir)
         fx.expectedType = o.value(QStringLiteral("type")).toString();
         fx.encrypted = o.value(QStringLiteral("encrypted")).toBool();
         fx.expectedPassword = o.value(QStringLiteral("password")).toString();
+        out.append(fx);
+    }
+    return out;
+}
+
+ChainResult runBkcrackChain(const IntegrationEnv &env, const QString &caseParentDir,
+                            const BkcrackFixtureSpec &fixture, int timeoutMs)
+{
+    ChainResult r;
+
+    r.stage = QStringLiteral("case-open");
+    QString err;
+    auto ws = CaseWorkspace::create(caseParentDir, CaseInfo{}, &err);
+    if (!ws) { r.message = err; return r; }
+
+    r.stage = QStringLiteral("intake");
+    auto intake = ws->addEvidence(fixture.zipPath);
+    if (!intake.ok) { r.message = intake.error; return r; }
+    const EvidenceItem item = intake.item;
+    r.sha256Before = item.sha256;
+    r.detectedType = item.type.id;
+
+    r.stage = QStringLiteral("bkcrack-recovery");
+    BkcrackAttackSpec spec;
+    spec.zipPath = ws->evidenceReadPath(item); // read the case's copy/reference, never the source
+    spec.targetEntry = fixture.targetEntry;
+    spec.plainFile = fixture.plainFile;
+
+    BkcrackExecutionBackend backend(env.bkcrack.program);
+    JobQueue queue(&backend);
+    queue.registerBackend(QStringLiteral("bkcrack"), &backend);
+    RecoveryController controller(&queue);
+    controller.setWorkspace(ws.get());
+
+    QString recovered;
+    QEventLoop loop;
+    QUuid jobId;
+    QObject::connect(&queue, &JobQueue::credentialRecovered, &loop,
+                     [&](const RecoveredCredential &c) { recovered = c.plaintext; loop.quit(); });
+    QObject::connect(&queue, &JobQueue::jobChanged, &loop, [&](const CrackingJob &j) {
+        if (j.id != jobId)
+            return;
+        if (j.state == JobState::Exhausted || j.state == JobState::Failed
+            || j.state == JobState::Stopped || j.state == JobState::Recovered)
+            loop.quit();
+    });
+    QTimer::singleShot(timeoutMs, &loop, [&] { loop.quit(); });
+    jobId = controller.queueBkcrackJob(spec, item.id, env.bkcrack.program);
+    loop.exec();
+
+    if (recovered.isEmpty()) { r.message = QStringLiteral("bkcrack did not recover the internal key"); return r; }
+    r.recovered = recovered;
+    if (!fixture.expectedContains.isEmpty() && !recovered.contains(fixture.expectedContains)) {
+        r.message = QStringLiteral("recovered '%1' lacks '%2'").arg(recovered, fixture.expectedContains);
+        return r;
+    }
+
+    r.stage = QStringLiteral("case-association");
+    bool associated = false;
+    for (const auto &c : ws->recoveredCredentials())
+        if (c.evidenceId == item.id) associated = true;
+    if (!associated) { r.message = QStringLiteral("key not associated to evidence/case"); return r; }
+
+    r.stage = QStringLiteral("integrity");
+    const auto integ = ws->verifyEvidenceIntegrity(item.id);
+    r.sha256After = integ.currentSha256;
+    if (!integ.ok) { r.message = QStringLiteral("evidence SHA-256 changed during processing"); return r; }
+
+    r.ok = true;
+    r.stage = QStringLiteral("complete");
+    r.message = QStringLiteral("recovered ZipCrypto internal key");
+    return r;
+}
+
+QVector<BkcrackFixtureSpec> loadBkcrackCorpus(const QString &dir)
+{
+    QVector<BkcrackFixtureSpec> out;
+    QFile f(QDir(dir).filePath(QStringLiteral("manifest.json")));
+    if (!f.open(QIODevice::ReadOnly))
+        return out;
+    const QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
+    for (const QJsonValue &v : doc.object().value(QStringLiteral("bkcrack")).toArray()) {
+        const QJsonObject o = v.toObject();
+        BkcrackFixtureSpec fx;
+        fx.zipPath = QDir(dir).filePath(o.value(QStringLiteral("file")).toString());
+        fx.targetEntry = o.value(QStringLiteral("entry")).toString();
+        fx.plainFile = QDir(dir).filePath(o.value(QStringLiteral("plainFile")).toString());
+        fx.expectedContains = o.value(QStringLiteral("keysContain")).toString();
         out.append(fx);
     }
     return out;

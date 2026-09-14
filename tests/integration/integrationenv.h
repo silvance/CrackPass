@@ -10,6 +10,8 @@
  *
  * Environment:
  *   CASEKEY_HASHCAT    - path to the hashcat executable (else looked up on PATH)
+ *   CASEKEY_JOHN       - path to the John the Ripper executable (else PATH)
+ *   CASEKEY_BKCRACK    - path to the bkcrack executable (else PATH)
  *   CASEKEY_TOOLS_DIR  - directory holding the *2john utilities (else PATH)
  *   CASEKEY_CORPUS     - directory holding fixtures + manifest.json
  */
@@ -38,10 +40,14 @@ public:
 
     ToolInfo hashcat;
     QString hashcatBackendInfo;             // `hashcat -I` (machine or plain)
+    ToolInfo john;                          // John the Ripper cracking engine
+    ToolInfo bkcrack;                       // bkcrack ZipCrypto known-plaintext engine
     QMap<QString, ToolInfo> extractors;     // keyed by tool id (office2john, ...)
     QString corpusDir;
 
     bool hashcatAvailable() const { return hashcat.available; }
+    bool johnAvailable() const { return john.available; }
+    bool bkcrackAvailable() const { return bkcrack.available; }
     bool corpusAvailable() const;
     // True when everything needed to run the full chain for `toolId` is present.
     bool canRun(const QString &extractorToolId) const;
