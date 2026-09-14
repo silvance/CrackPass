@@ -31,7 +31,7 @@ QStringList JohnExecutionBackend::composeArgs(const CrackingJob &job, const Star
         return args;
     }
 
-    args << job.hashcatArgs; // the john attack argv (built by JohnCommandBuilder)
+    args << job.engineArgs; // the john attack argv (built by JohnCommandBuilder)
     if (!opts.sessionName.isEmpty())
         args << (QStringLiteral("--session=") + opts.sessionName);
     if (!opts.potfilePath.isEmpty())
@@ -43,7 +43,7 @@ QStringList JohnExecutionBackend::composeArgs(const CrackingJob &job, const Star
 
 QString JohnExecutionBackend::programFor(const CrackingJob &job, const QString &configured)
 {
-    return job.hashcatPath.isEmpty() ? configured : job.hashcatPath;
+    return job.enginePath.isEmpty() ? configured : job.enginePath;
 }
 
 QString JohnExecutionBackend::potPlaintextToken(const QString &potLine, const QString &knownHash)

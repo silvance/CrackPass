@@ -54,19 +54,25 @@ struct CrackingJob
     quint32 hashMode = 0;
     int attackMode = 0;
 
-    // Which recovery engine ran (or will run) this job, e.g. "hashcat" or
-    // "john". Recorded for provenance and used to route the job to its backend.
-    // The hashcat* fields below hold the chosen engine's path/version/argv (the
-    // names are historical; for a non-hashcat engine they are that engine's).
+    // Which recovery engine ran (or will run) this job, e.g. "hashcat", "john"
+    // or "bkcrack". Recorded for provenance and used to route the job to its
+    // backend. `engineDisplayName` is the human-readable name for reports.
     QString engineId;
+    QString engineDisplayName;
 
-    QStringList hashcatArgs;   // exact argv passed to the engine
-    QString hashcatPath;
+    // Engine-neutral provenance: the exact argv, resolved executable, version
+    // banner and (best-effort) SHA-256 of the executable that ran this job.
+    // These were named hashcat* when hashcat was the only engine; old case
+    // records using those names still load (see fromJson).
+    QStringList engineArgs;    // exact argv passed to the engine
+    QString enginePath;        // resolved executable
+    QString engineVersion;     // version / banner
+    QString engineExeSha256;   // lowercase hex SHA-256 of the executable, if known
+
     QString hashFile;          // extracted-hash file being attacked
     QStringList wordlists;     // wordlists used (for reporting)
     QStringList rules;         // rule files used
     QString mask;              // mask used (a=3/6/7)
-    QString hashcatVersion;
     QVector<ComputeDevice> devices;
 
     QDateTime startedUtc;

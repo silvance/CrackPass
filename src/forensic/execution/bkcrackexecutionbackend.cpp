@@ -22,12 +22,12 @@ QStringList BkcrackExecutionBackend::composeArgs(const CrackingJob &job, const S
 {
     // The full bkcrack attack argv was produced by BkcrackCommandBuilder and
     // stored on the job. bkcrack has no session/pot/status plumbing to add.
-    return job.hashcatArgs;
+    return job.engineArgs;
 }
 
 QString BkcrackExecutionBackend::programFor(const CrackingJob &job, const QString &configured)
 {
-    return job.hashcatPath.isEmpty() ? configured : job.hashcatPath;
+    return job.enginePath.isEmpty() ? configured : job.enginePath;
 }
 
 QString BkcrackExecutionBackend::parseKeysLine(const QString &line)
@@ -64,7 +64,7 @@ bool BkcrackExecutionBackend::parseProgressLine(const QString &line, HashcatStat
 QString BkcrackExecutionBackend::targetLabel(const CrackingJob &job)
 {
     QString archive, entry;
-    const QStringList &a = job.hashcatArgs;
+    const QStringList &a = job.engineArgs;
     for (int i = 0; i + 1 < a.size(); ++i) {
         if (a.at(i) == QStringLiteral("-C"))
             archive = a.at(i + 1);

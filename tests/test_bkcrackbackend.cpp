@@ -29,8 +29,8 @@ static CrackingJob bkcrackJob()
     CrackingJob j;
     j.id = QUuid::createUuid();
     j.engineId = QStringLiteral("bkcrack");
-    j.hashcatPath = QStringLiteral("/tools/bkcrack");
-    j.hashcatArgs = {QStringLiteral("-C"), QStringLiteral("/case/e.zip"),
+    j.enginePath = QStringLiteral("/tools/bkcrack");
+    j.engineArgs = {QStringLiteral("-C"), QStringLiteral("/case/e.zip"),
                      QStringLiteral("-c"), QStringLiteral("secret.doc"),
                      QStringLiteral("-p"), QStringLiteral("/case/known.bin")};
     return j;
@@ -38,7 +38,7 @@ static CrackingJob bkcrackJob()
 
 void TestBkcrackBackend::composeArgsIsTheJobArgv()
 {
-    QCOMPARE(BkcrackExecutionBackend::composeArgs(bkcrackJob(), {}), bkcrackJob().hashcatArgs);
+    QCOMPARE(BkcrackExecutionBackend::composeArgs(bkcrackJob(), {}), bkcrackJob().engineArgs);
 }
 
 void TestBkcrackBackend::programPrefersJobPath()
@@ -46,7 +46,7 @@ void TestBkcrackBackend::programPrefersJobPath()
     CrackingJob j = bkcrackJob();
     QCOMPARE(BkcrackExecutionBackend::programFor(j, QStringLiteral("/fallback/bkcrack")),
              QStringLiteral("/tools/bkcrack"));
-    j.hashcatPath.clear();
+    j.enginePath.clear();
     QCOMPARE(BkcrackExecutionBackend::programFor(j, QStringLiteral("/fallback/bkcrack")),
              QStringLiteral("/fallback/bkcrack"));
 }

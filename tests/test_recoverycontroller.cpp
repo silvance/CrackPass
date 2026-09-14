@@ -86,11 +86,11 @@ void TestRecoveryController::queuesBuildsAndPersistsJob()
     const CrackingJob j = ws->jobs().first(); // by value: jobs() returns a temporary
     QCOMPARE(j.id, jobId);
     QCOMPARE(j.evidenceId, evidenceId);
-    QCOMPARE(j.hashcatPath, QStringLiteral("/tools/hashcat"));
-    QCOMPARE(j.hashcatVersion, QStringLiteral("v7.1"));
+    QCOMPARE(j.enginePath, QStringLiteral("/tools/hashcat"));
+    QCOMPARE(j.engineVersion, QStringLiteral("v7.1"));
     QCOMPARE(j.hashMode, 13400u);
     QCOMPARE(j.engineId, QStringLiteral("hashcat")); // default engine recorded
-    QVERIFY(!j.hashcatArgs.isEmpty());         // built via the engine
+    QVERIFY(!j.engineArgs.isEmpty());         // built via the engine
 }
 
 void TestRecoveryController::recoveredCredentialIsPersisted()
@@ -215,8 +215,8 @@ void TestRecoveryController::queuesBkcrackJob()
     QCOMPARE(ws->jobs().size(), 1);
     const CrackingJob j = ws->jobs().first();
     QCOMPARE(j.engineId, QStringLiteral("bkcrack"));
-    QVERIFY(j.hashcatArgs.contains(QStringLiteral("-C")));
-    QVERIFY(j.hashcatArgs.contains(QStringLiteral("secret.doc")));
+    QVERIFY(j.engineArgs.contains(QStringLiteral("-C")));
+    QVERIFY(j.engineArgs.contains(QStringLiteral("secret.doc")));
 }
 
 void TestRecoveryController::refusesIncompleteBkcrackJob()
@@ -259,7 +259,7 @@ void TestRecoveryController::queuesJohnWordlistJob()
     QCOMPARE(ws->jobs().size(), 1);
     const CrackingJob j = ws->jobs().first(); // by value: jobs() returns a temporary
     QCOMPARE(j.engineId, QStringLiteral("john"));
-    QVERIFY(j.hashcatArgs.contains(QStringLiteral("--wordlist=wl.txt")));
+    QVERIFY(j.engineArgs.contains(QStringLiteral("--wordlist=wl.txt")));
 }
 
 void TestRecoveryController::refusesJohnInexpressibleAttack()

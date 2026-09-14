@@ -83,7 +83,7 @@ void TestCrackedPlain::nonUtf8BytesPreservedLosslessly()
 void TestCrackedPlain::outfileFormatIsPlain()
 {
     CrackingJob job;
-    job.hashcatArgs = {"-m", "13400", "-a", "0", "hash.txt", "wl.txt"};
+    job.engineArgs = {"-m", "13400", "-a", "0", "hash.txt", "wl.txt"};
     JobExecutionBackend::StartOptions opts;
     opts.sessionName = "s";
     opts.outfilePath = "/case/cracked.out";

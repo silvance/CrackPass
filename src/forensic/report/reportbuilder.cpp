@@ -56,11 +56,12 @@ RecoveryReport ReportBuilder::build(const CaseWorkspace &ws, const CrackingJob &
     r.wordlists = job.wordlists;
     r.rules = job.rules;
     r.mask = job.mask;
-    r.hashcatArgs = job.hashcatArgs;
+    r.hashcatArgs = job.engineArgs;
 
-    // Hashcat environment
-    r.hashcatVersion = job.hashcatVersion.isEmpty() ? QStringLiteral("(not recorded)")
-                                                    : job.hashcatVersion;
+    // Engine environment (R6 renames the report's own fields; here we read the
+    // engine-neutral job provenance into the existing report fields).
+    r.hashcatVersion = job.engineVersion.isEmpty() ? QStringLiteral("(not recorded)")
+                                                   : job.engineVersion;
     for (const ComputeDevice &d : job.devices)
         r.devices << QStringLiteral("#%1 %2 (%3)").arg(d.id).arg(d.name, d.backend);
     if (r.devices.isEmpty())

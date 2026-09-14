@@ -31,8 +31,8 @@ static CrackingJob johnJob()
     CrackingJob j;
     j.id = QUuid::createUuid();
     j.engineId = QStringLiteral("john");
-    j.hashcatPath = QStringLiteral("/tools/john/run/john");
-    j.hashcatArgs = {QStringLiteral("--wordlist=wl.txt"), QStringLiteral("hash.txt")};
+    j.enginePath = QStringLiteral("/tools/john/run/john");
+    j.engineArgs = {QStringLiteral("--wordlist=wl.txt"), QStringLiteral("hash.txt")};
     j.hashFile = QStringLiteral("hash.txt");
     return j;
 }
@@ -70,7 +70,7 @@ void TestJohnBackend::programPrefersJobPath()
     CrackingJob j = johnJob();
     QCOMPARE(JohnExecutionBackend::programFor(j, QStringLiteral("/fallback/john")),
              QStringLiteral("/tools/john/run/john"));
-    j.hashcatPath.clear();
+    j.enginePath.clear();
     QCOMPARE(JohnExecutionBackend::programFor(j, QStringLiteral("/fallback/john")),
              QStringLiteral("/fallback/john"));
 }

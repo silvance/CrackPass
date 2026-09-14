@@ -20,7 +20,7 @@ private slots:
 void TestBackendCompose::freshRunInjectsStatusAndSession()
 {
     CrackingJob job;
-    job.hashcatArgs = {"-m", "13400", "-a", "0", "hash.txt", "wl.txt"};
+    job.engineArgs = {"-m", "13400", "-a", "0", "hash.txt", "wl.txt"};
     JobExecutionBackend::StartOptions opts;
     opts.sessionName = "cp-1";
     opts.potfilePath = "/case/job.pot";
@@ -42,7 +42,7 @@ void TestBackendCompose::freshRunInjectsStatusAndSession()
 void TestBackendCompose::resumeUsesRestore()
 {
     CrackingJob job;
-    job.hashcatArgs = {"-m", "13400", "-a", "0", "hash.txt", "wl.txt"};
+    job.engineArgs = {"-m", "13400", "-a", "0", "hash.txt", "wl.txt"};
     JobExecutionBackend::StartOptions opts;
     opts.sessionName = "cp-1";
     opts.restorePath = "/case/session.restore";
@@ -62,7 +62,7 @@ void TestBackendCompose::executesRecordedBinaryNotConstructionTimePath()
     // that if the configured hashcat path changes between job creation and
     // execution, the process actually run is still the one the record names.
     CrackingJob job;
-    job.hashcatPath = "/tools/B/hashcat.exe"; // recorded at job creation
+    job.enginePath = "/tools/B/hashcat.exe"; // recorded at job creation
     QCOMPARE(HashcatExecutionBackend::programFor(job, "/tools/A/hashcat.exe"),
              QStringLiteral("/tools/B/hashcat.exe"));
 
