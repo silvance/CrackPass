@@ -7,6 +7,7 @@
 #include "forensic/deps/dependencyprobe.h"
 #include "forensic/deps/toolchainservice.h"
 #include "forensic/extraction/processrunner.h"
+#include "forensic/hashingservice.h"
 #include "settingsmanager.h"
 
 #include <QApplication>
@@ -83,7 +84,31 @@ void DependencyDoctorDialog::rescan()
     auto *dev = kv(hc, tr("Backend / devices"), QString());
     dev->setText(1, rep.hashcatBackendInfo.isEmpty() ? tr("(unavailable)")
                                                       : rep.hashcatBackendInfo.left(2000));
+    if (rep.hashcat.found)
+        kv(hc, tr("SHA-256"), forensic::HashingService::sha256File(rep.hashcat.program));
     hc->setExpanded(true);
+
+    // Other recovery engines (John the Ripper, bkcrack). Reported the same way
+    // as hashcat so the examiner can see every engine's path/version/integrity.
+    const auto addEngine = [&](const QString &name, const ToolStatus &t) {
+        auto *it = new QTreeWidgetItem(m_tree);
+        it->setText(0, name);
+        it->setText(1, t.found ? tr("detected") : tr("NOT FOUND"));
+        if (t.found) {
+            kv(it, tr("Path"), t.program);
+            kv(it, tr("Resolved via"), t.source);
+            kv(it, tr("Version"), t.version);
+            kv(it, tr("Self-test"), t.selfTestRun
+                                        ? (t.selfTestOk ? tr("passed") : tr("FAILED"))
+                                        : tr("not run"));
+            kv(it, tr("SHA-256"), forensic::HashingService::sha256File(t.program));
+        }
+        if (!t.detail.isEmpty())
+            kv(it, tr("Detail"), t.detail);
+        it->setExpanded(t.found);
+    };
+    addEngine(tr("John the Ripper"), rep.john);
+    addEngine(tr("bkcrack"), rep.bkcrack);
 
     // extractors
     auto *ex = new QTreeWidgetItem(m_tree);

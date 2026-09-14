@@ -29,6 +29,8 @@ private slots:
     void missingToolReported();
     void hashcatSelfTestParsesVersion();
     void hashcatSelfTestFailureReported();
+    void engineBannerParsesVersion();
+    void bkcrackPortableLayoutDiscovered();
     void resourcesReported();
 };
 
@@ -84,6 +86,43 @@ void TestDependencyProbe::hashcatSelfTestParsesVersion()
     QVERIFY(rep.hashcat.selfTestRun);
     QVERIFY(rep.hashcat.selfTestOk);
     QCOMPARE(rep.hashcat.version, QStringLiteral("v7.1.2"));
+}
+
+void TestDependencyProbe::engineBannerParsesVersion()
+{
+    // John has no --version flag; the probe runs it and picks the identifying
+    // banner line out of the output (a non-zero exit is expected).
+    QTemporaryDir dir;
+    const QString appDir = dir.filePath("app");
+    touchExe(QDir(appDir).filePath("tools/john/run/john"));
+    FakeProcessRunner runner;
+    ProcessRunner::Result r; r.started = true; r.exitCode = 1;
+    r.stdErr = "John the Ripper 1.9.0-jumbo-1\nUsage: john ...\n";
+    runner.nextResult = r;
+    auto settings = [](const QString &) { return QString(); };
+    DependencyProbe probe(&runner, appDir, settings);
+    const DependencyReport rep = probe.run();
+    QVERIFY(rep.john.found);
+    QVERIFY(rep.john.selfTestRun);
+    QVERIFY(rep.john.selfTestOk);
+    QVERIFY(rep.john.version.contains(QStringLiteral("John the Ripper")));
+}
+
+void TestDependencyProbe::bkcrackPortableLayoutDiscovered()
+{
+    // bkcrack resolves from its own portable location (tools/bkcrack/), and its
+    // banner is parsed the same way.
+    QTemporaryDir dir;
+    const QString appDir = dir.filePath("app");
+    touchExe(QDir(appDir).filePath("tools/bkcrack/bkcrack"));
+    FakeProcessRunner runner;
+    runner.nextResult = FakeProcessRunner::ok("bkcrack 1.5.0 - 2022-07-07\n");
+    auto settings = [](const QString &) { return QString(); };
+    DependencyProbe probe(&runner, appDir, settings);
+    const DependencyReport rep = probe.run();
+    QVERIFY(rep.bkcrack.found);
+    QCOMPARE(rep.bkcrack.source, QStringLiteral("portable"));
+    QVERIFY(rep.bkcrack.version.contains(QStringLiteral("bkcrack")));
 }
 
 void TestDependencyProbe::hashcatSelfTestFailureReported()
