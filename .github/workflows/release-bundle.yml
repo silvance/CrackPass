@@ -1,0 +1,123 @@
+name: Publish full Windows bundle
+
+# Produces a self-contained, turnkey CaseKey bundle for Windows: the app + Qt
+# runtime + managed dictionaries + the recovery engines (hashcat, John the
+# Ripper Jumbo incl. *2john, bkcrack) + an embeddable Python for the *2john
+# scripts, laid out so everything resolves with no configuration.
+#
+# Engine sources/versions are pinned in tools/engines.lock.json and integrity is
+# FAIL-CLOSED (see tools/fetch_engines.py): a release cannot be built until every
+# engine has a verified sha256. The FIRST time (or after bumping a version/url),
+# run this workflow via "Run workflow" with bootstrap_hashes = true to print the
+# digests, commit them into engines.lock.json, then publish a release.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      bootstrap_hashes:
+        description: "Only download the engine sources and print their sha256 (to lock engines.lock.json). Does not build or publish."
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      # --- Bootstrap mode: print sha256 of each pinned source, then stop. ---
+      - name: Print engine hashes (bootstrap)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.bootstrap_hashes }}
+        shell: pwsh
+        run: |
+          python tools/fetch_engines.py --print-hashes | Tee-Object -FilePath hashes.txt
+          Get-Content hashes.txt >> $env:GITHUB_STEP_SUMMARY
+
+      # --- Normal mode: build, assemble the bundle, publish. ---
+      - name: Set up MSYS2 with UCRT64
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.bootstrap_hashes) }}
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: |
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-qt6-base
+            zip
+
+      - name: Build
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.bootstrap_hashes) }}
+        shell: msys2 {0}
+        run: |
+          cmake -B build
+          cmake --build build
+
+      - name: Stage app + Qt runtime
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.bootstrap_hashes) }}
+        shell: msys2 {0}
+        run: |
+          NAME="${{ github.ref_name }}"
+          if [ -z "$NAME" ]; then NAME="bundle-${{ github.run_number }}"; fi
+          echo "BUNDLE=casekey-$NAME" >> "$GITHUB_ENV"
+          mkdir -p "casekey-$NAME/docs"
+          cp build/casekey.exe "casekey-$NAME/"
+          cp README.md CHANGELOG.md FAQ.md LICENSE "casekey-$NAME/docs/" 2>/dev/null || true
+          cp docs/DEPLOYMENT.md docs/THIRD_PARTY.md docs/FORENSIC_VALIDATION.md "casekey-$NAME/docs/" 2>/dev/null || true
+          cd "casekey-$NAME/"
+          ldd casekey.exe | grep /ucrt64 | awk '{print $3}' | xargs -i cp {} .
+          windeployqt6.exe casekey.exe \
+            --release --no-translations --no-quick-import \
+            --no-system-d3d-compiler --no-system-dxc-compiler \
+            --no-compiler-runtime --no-opengl-sw --no-ffmpeg
+
+      - name: Bundle managed dictionaries
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.bootstrap_hashes) }}
+        shell: pwsh
+        run: |
+          $dest = "$env:BUNDLE/dictionaries"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item resources/dictionaries/manifest.json $dest/
+          Copy-Item resources/dictionaries/README.md $dest/
+          Get-ChildItem resources/dictionaries/*.txt -ErrorAction SilentlyContinue | Copy-Item -Destination $dest/
+          python tools/check_release_dictionaries.py $dest
+
+      - name: Fetch + lay out recovery engines (verified)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.bootstrap_hashes) }}
+        shell: pwsh
+        run: |
+          python tools/fetch_engines.py --dest "$env:BUNDLE"
+
+      - name: Add launcher + first-run guide
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.bootstrap_hashes) }}
+        shell: pwsh
+        run: |
+          Copy-Item packaging/CaseKey.cmd "$env:BUNDLE/"
+          Copy-Item packaging/FIRST_RUN.md "$env:BUNDLE/"
+
+      - name: Zip bundle
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.bootstrap_hashes) }}
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "$env:BUNDLE" -DestinationPath "$env:BUNDLE-windows-x64-full.zip"
+
+      # On a real release: attach the bundle. On manual dispatch: keep it as a
+      # build artifact so maintainers can test it before cutting a release.
+      - name: Upload release asset
+        if: ${{ github.event_name == 'release' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "${{ env.BUNDLE }}-windows-x64-full.zip"
+
+      - name: Upload build artifact (manual runs)
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.bootstrap_hashes }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BUNDLE }}-windows-x64-full
+          path: "${{ env.BUNDLE }}-windows-x64-full.zip"

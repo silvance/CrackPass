@@ -112,12 +112,37 @@ in one of two storage modes (the examiner's choice at intake):
 Before every re-read CaseKey re-verifies the SHA-256 and fails loudly on a
 mismatch (see `FORENSIC_VALIDATION.md`).
 
-## 5. Windows release build
+## 5. Windows release builds
 
-The repository's `.github/workflows/build-release.yml` produces the Windows binary
-via MSYS2 UCRT64 + `windeployqt6`, bundles the Qt runtime and docs, and packages
-the `dictionaries/` directory (the manifest plus any provisioned wordlist files;
-it fails the release if a dictionary declared `required` was not provisioned). For
-a disconnected deployment, add the `tools/` (and, if used, `wordlists/`) trees
-above to the release directory before transferring it to the workstation. No step
-in the build or run path requires Internet access on the target.
+Two release workflows are provided:
+
+**Lean bundle — `.github/workflows/build-release.yml`.** Produces the Windows
+binary via MSYS2 UCRT64 + `windeployqt6`, bundles the Qt runtime, docs and the
+`dictionaries/` directory (failing the release if a dictionary declared
+`required` was not provisioned). It does **not** ship the engines — supply the
+`tools/` (and, if used, `wordlists/`) trees above on the workstation. Smallest
+download; matches the "examiner supplies engines" posture.
+
+**Full turnkey bundle — `.github/workflows/release-bundle.yml`.** Produces a
+self-contained, double-click bundle: the app + Qt runtime + managed dictionaries
+**plus the recovery engines** (hashcat, John the Ripper Jumbo incl. `*2john`,
+bkcrack) and an embeddable Python for the `*2john` scripts, all laid out under
+`tools/` / `runtime/` exactly where CaseKey's portable discovery looks. The
+examiner unzips and double-clicks `CaseKey.cmd` — no configuration. See
+`packaging/FIRST_RUN.md`.
+
+- Engine sources and versions are pinned in `tools/engines.lock.json`; the
+  assembler is `tools/fetch_engines.py`.
+- Integrity is **fail-closed**: an engine is bundled only if its committed
+  `sha256` matches the download, so an unverified third-party binary is never
+  shipped. The first time (or after bumping a version/URL), run the workflow with
+  **`bootstrap_hashes = true`** to print the digests, commit them into
+  `engines.lock.json`, and confirm each pinned `url`/`version` before publishing.
+- License texts for every bundled tool are collected into `LICENSES/`, and a
+  written **`SOURCE_OFFER.md`** (for the GPL components — John the Ripper) points
+  at the exact upstream source for the bundled version. Bundled tools and their
+  licenses are listed in `docs/THIRD_PARTY.md`.
+
+Neither the build nor the run path requires Internet access on the target; the
+full bundle's engines are fetched **at build time** on the CI runner, not on the
+workstation.
