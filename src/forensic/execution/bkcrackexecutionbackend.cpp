@@ -107,12 +107,14 @@ void BkcrackExecutionBackend::launch(const QUuid &jobId)
                     return;
                 drainOutput(jobId); // capture any final keys line
                 const Pending pending = c->pending;
-                c->proc->deleteLater();
-                c->proc = nullptr;
                 if (pending == Pending::Pause) {
+                    // Resumable slot-wise: keep the context, release the process.
+                    c->proc->deleteLater();
+                    c->proc = nullptr;
                     emit paused(jobId);
                 } else if (pending == Pending::Stop) {
                     emit stopped(jobId);
+                    disposeContext(jobId); // terminal
                 } else {
                     // bkcrack has no hashcat-style status code, so pass none (-1).
                     // When keys were recovered the cracked() signal has already
@@ -120,15 +122,32 @@ void BkcrackExecutionBackend::launch(const QUuid &jobId)
                     // Recovered; otherwise it uses the exit code (non-zero =>
                     // Exhausted).
                     emit finished(jobId, exitCode, -1);
+                    disposeContext(jobId); // terminal
                 }
             });
+    // Report Running only on the actual started() signal, so a FailedToStart
+    // never transiently appears as Running.
+    connect(proc, &QProcess::started, this, [this, jobId] { emit running(jobId); });
     connect(proc, &QProcess::errorOccurred, this, [this, jobId](QProcess::ProcessError e) {
-        if (e == QProcess::FailedToStart)
+        if (e == QProcess::FailedToStart) {
             emit failed(jobId, QStringLiteral("Failed to start bkcrack."));
+            disposeContext(jobId);
+        }
     });
 
     proc->start(QIODevice::ReadOnly);
-    emit running(jobId);
+}
+
+void BkcrackExecutionBackend::disposeContext(const QUuid &jobId)
+{
+    Context *c = m_contexts.take(jobId);
+    if (!c)
+        return;
+    if (c->proc) {
+        c->proc->deleteLater();
+        c->proc = nullptr;
+    }
+    delete c;
 }
 
 void BkcrackExecutionBackend::start(const CrackingJob &job, const StartOptions &opts)

@@ -68,6 +68,8 @@ private:
     };
 
     void launch(const QUuid &jobId);
+    // Tear down and forget a terminal job's context. Safe to call more than once.
+    void disposeContext(const QUuid &jobId);
     void requestShutdown(const QUuid &jobId, Pending kind);
     void drainOutput(const QUuid &jobId);
 
