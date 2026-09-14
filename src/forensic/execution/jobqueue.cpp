@@ -147,11 +147,17 @@ void JobQueue::tryStartNext()
     }
 }
 
-void JobQueue::releaseAndAdvance(const QUuid &finishedId)
+void JobQueue::stampEnded(const QUuid &id)
 {
-    const int i = indexOf(finishedId);
+    const int i = indexOf(id);
     if (i >= 0)
         m_jobs[i].endedUtc = QDateTime::currentDateTimeUtc();
+}
+
+void JobQueue::releaseAndAdvance(const QUuid &finishedId)
+{
+    // Timestamps are stamped by the terminal handler (stampEnded) BEFORE it
+    // persists; this only frees the GPU/queue slot and advances.
     if (m_running == finishedId)
         m_running = QUuid();
     tryStartNext();
@@ -198,18 +204,24 @@ void JobQueue::onCracked(const QUuid &jobId, const QString &hash, const QByteArr
     cred.recoveredUtc = QDateTime::currentDateTimeUtc();
     emit credentialRecovered(cred);
 
-    // Show recovery immediately, even before the process exits.
+    // Show recovery immediately, even before the process exits. endedUtc is
+    // stamped by onFinished when the process actually exits, so the final
+    // persisted record reflects the true completion time.
     setState(jobId, JobState::Recovered);
 }
 
 void JobQueue::onPaused(const QUuid &jobId)
 {
+    // Pause is NOT terminal: do not stamp endedUtc (that would report a bogus
+    // completion time and poison runtime once the job resumes).
     setState(jobId, JobState::Paused);
     releaseAndAdvance(jobId); // GPU is free; another job may run
 }
 
 void JobQueue::onStopped(const QUuid &jobId)
 {
+    // Assemble the full terminal transition before the persist emission.
+    stampEnded(jobId);
     setState(jobId, JobState::Stopped);
     releaseAndAdvance(jobId);
 }
@@ -230,6 +242,8 @@ void JobQueue::onFinished(const QUuid &jobId, int exitCode, int hashcatStatusCod
     } else {
         state = JobState::Failed;
     }
+    // Stamp the final completion time before setState persists the record.
+    stampEnded(jobId);
     setState(jobId, state);
     releaseAndAdvance(jobId);
 }
@@ -239,6 +253,8 @@ void JobQueue::onFailed(const QUuid &jobId, const QString &error)
     const int i = indexOf(jobId);
     if (i >= 0)
         m_jobs[i].result = error;
+    // Assemble the full terminal transition (result + endedUtc) before persist.
+    stampEnded(jobId);
     setState(jobId, JobState::Failed);
     releaseAndAdvance(jobId);
 }
@@ -267,6 +283,10 @@ void JobQueue::resume(const QUuid &jobId)
         return;
     }
     m_running = jobId;
+    // Clear any stale completion time (e.g. from a legacy record that stamped
+    // endedUtc on pause) so the eventual terminal transition stamps the real
+    // final completion; startedUtc is left as the original first-start time.
+    m_jobs[i].endedUtc = QDateTime();
     setState(jobId, JobState::Preparing);
     backend->resume(m_jobs.at(i), optionsFor(jobId, true));
 }
