@@ -1,3 +1,7 @@
 /build/
 /src/config.h
 CMakeLists.txt.user
+
+# Python bytecode cache
+__pycache__/
+*.pyc
