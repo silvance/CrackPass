@@ -27,6 +27,9 @@ private slots:
     void extractionResolverMatchesReport();
     void extractionResolverHonoursSettingsOverride();
     void unresolvedExtractorIsNotFound();
+    void resolveEngineResolvesPathVersionAndSha256();
+    void resolveEngineUnavailableEngineHasReason();
+    void engineSettingsKeyMapping();
 };
 
 // The whole point of the service: what the Doctor reports for an extractor must
@@ -91,6 +94,48 @@ void TestToolchainService::unresolvedExtractorIsNotFound()
     auto settings = [](const QString &) { return QString(); };
     ToolchainService svc(nullptr, dir.filePath("app"), settings);
     QVERIFY(!svc.extractionResolver().has(QStringLiteral("keepass2john")));
+}
+
+void TestToolchainService::resolveEngineResolvesPathVersionAndSha256()
+{
+    QTemporaryDir dir;
+    const QString appDir = dir.filePath("app");
+    const QString hc = QDir(appDir).filePath("bin/hashcat");
+    touchExe(hc);
+
+    auto settings = [&](const QString &k) {
+        return k == QStringLiteral("hashcatPath") ? hc : QString();
+    };
+    FakeProcessRunner runner;
+    runner.nextResult = FakeProcessRunner::ok("hashcat v7.1.0\n");
+    ToolchainService svc(&runner, appDir, settings);
+
+    const auto e = svc.resolveEngine(QStringLiteral("hashcat"));
+    QVERIFY(e.available);
+    QCOMPARE(e.path, hc);                                  // resolved from settings
+    QCOMPARE(e.version, QStringLiteral("hashcat v7.1.0")); // probed via the runner
+    QCOMPARE(e.sha256.size(), 64);                         // executable hashed
+    // It probed with --version.
+    QVERIFY(runner.lastArgs.contains(QStringLiteral("--version")));
+}
+
+void TestToolchainService::resolveEngineUnavailableEngineHasReason()
+{
+    QTemporaryDir dir;
+    auto settings = [](const QString &) { return QString(); };
+    ToolchainService svc(nullptr, dir.filePath("app"), settings);
+    const auto e = svc.resolveEngine(QStringLiteral("bkcrack"));
+    QVERIFY(!e.available);
+    QVERIFY(!e.reason.isEmpty());
+    QVERIFY(e.path.isEmpty());
+}
+
+void TestToolchainService::engineSettingsKeyMapping()
+{
+    QCOMPARE(ToolchainService::engineSettingsKey(QStringLiteral("hashcat")), QStringLiteral("hashcatPath"));
+    QCOMPARE(ToolchainService::engineSettingsKey(QStringLiteral("john")), QStringLiteral("johnPath"));
+    QCOMPARE(ToolchainService::engineSettingsKey(QStringLiteral("bkcrack")), QStringLiteral("bkcrackPath"));
+    QVERIFY(ToolchainService::engineSettingsKey(QStringLiteral("nope")).isEmpty());
 }
 
 QTEST_GUILESS_MAIN(TestToolchainService)

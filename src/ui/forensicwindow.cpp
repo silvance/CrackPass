@@ -83,74 +83,6 @@ forensic::ToolchainService makeToolchainService(forensic::ProcessRunner *runner)
     return forensic::ToolchainService(runner, QApplication::applicationDirPath(), settings);
 }
 
-QString probeHashcatVersion(const QString &path)
-{
-    if (path.isEmpty())
-        return QString();
-    QProcess p;
-    p.start(path, {QStringLiteral("--version")}, QIODevice::ReadOnly);
-    if (!p.waitForStarted(3000))
-        return QString();
-    if (!p.waitForFinished(5000)) {
-        p.kill();
-        p.waitForFinished(1000);
-        return QString();
-    }
-    return QString::fromUtf8(p.readAllStandardOutput()).trimmed()
-        .split(QLatin1Char('\n')).value(0).trimmed();
-}
-
-// John has no --version flag; run with no arguments (it prints its version
-// banner and usage, then exits) and pick out the identifying line. Best-effort
-// provenance only -- an empty result does not block the run.
-QString probeJohnVersion(const QString &path)
-{
-    if (path.isEmpty())
-        return QString();
-    QProcess p;
-    p.setProcessChannelMode(QProcess::MergedChannels);
-    p.start(path, {}, QIODevice::ReadOnly);
-    if (!p.waitForStarted(3000))
-        return QString();
-    if (!p.waitForFinished(5000)) {
-        p.kill();
-        p.waitForFinished(1000);
-        return QString();
-    }
-    const QStringList lines = QString::fromUtf8(p.readAll()).split(QLatin1Char('\n'));
-    for (const QString &l : lines) {
-        const QString t = l.trimmed();
-        if (t.contains(QStringLiteral("John the Ripper"), Qt::CaseInsensitive))
-            return t;
-    }
-    return lines.value(0).trimmed();
-}
-
-// bkcrack prints its version banner when run with no arguments; capture the
-// first line mentioning bkcrack. Best-effort provenance only.
-QString probeBkcrackVersion(const QString &path)
-{
-    if (path.isEmpty())
-        return QString();
-    QProcess p;
-    p.setProcessChannelMode(QProcess::MergedChannels);
-    p.start(path, {}, QIODevice::ReadOnly);
-    if (!p.waitForStarted(3000))
-        return QString();
-    if (!p.waitForFinished(5000)) {
-        p.kill();
-        p.waitForFinished(1000);
-        return QString();
-    }
-    const QStringList lines = QString::fromUtf8(p.readAll()).split(QLatin1Char('\n'));
-    for (const QString &l : lines) {
-        const QString t = l.trimmed();
-        if (t.contains(QStringLiteral("bkcrack"), Qt::CaseInsensitive))
-            return t;
-    }
-    return lines.value(0).trimmed();
-}
-
 } // namespace
 
 ForensicWindow::ForensicWindow(QWidget *parent)
@@ -246,19 +178,21 @@ ForensicWindow::ForensicWindow(QWidget *parent)
     setCentralWidget(m_rootStack);
 
     // Execution: one attached hashcat backend + a serial job queue. The queue
-    // never starts anything not explicitly enqueued by the examiner.
-    m_backend = new HashcatExecutionBackend(
-        SettingsManager::instance().getKey<QString>("hashcatPath"), this);
+    // never starts anything not explicitly enqueued by the examiner. Each engine
+    // path is resolved through ToolchainService (settings -> bundled portable ->
+    // PATH) -- the SAME authority the queue-time provenance uses -- so what a
+    // backend runs cannot drift from what a job records.
+    const forensic::ToolchainService toolchain = makeToolchainService(nullptr);
+    m_backend = new HashcatExecutionBackend(toolchain.resolveEnginePath(QStringLiteral("hashcat")), this);
     m_queue = new JobQueue(m_backend, this);
     // John the Ripper is a second engine; jobs whose engineId is "john" route to
     // this backend. The default (hashcat) backend still serves every other job.
-    m_johnBackend = new JohnExecutionBackend(
-        SettingsManager::instance().getKey<QString>("johnPath"), this);
+    m_johnBackend = new JohnExecutionBackend(toolchain.resolveEnginePath(QStringLiteral("john")), this);
     m_queue->registerBackend(QStringLiteral("john"), m_johnBackend);
     // bkcrack is the ZipCrypto known-plaintext engine; jobs whose engineId is
     // "bkcrack" route to this backend.
     m_bkcrackBackend = new forensic::BkcrackExecutionBackend(
-        SettingsManager::instance().getKey<QString>("bkcrackPath"), this);
+        toolchain.resolveEnginePath(QStringLiteral("bkcrack")), this);
     m_queue->registerBackend(QStringLiteral("bkcrack"), m_bkcrackBackend);
     // The controller owns the persistence side of recovery (job state + recovered
     // credentials -> case). Construct it before wiring the display slots so its
@@ -730,24 +664,19 @@ bool ForensicWindow::ensureExtractedHash(const EvidenceItem &item, quint32 &mode
 
 bool ForensicWindow::resolveEngineTool(const QString &engineId, QString &toolPath, QString &toolVersion)
 {
-    if (engineId == QStringLiteral("john")) {
-        toolPath = SettingsManager::instance().getKey<QString>("johnPath");
-        if (toolPath.isEmpty()) {
-            QMessageBox::warning(this, tr("Queue Attack"),
-                                 tr("Configure the John the Ripper path in Settings before "
-                                    "queuing a John job."));
-            return false;
-        }
-        toolVersion = probeJohnVersion(toolPath);
-    } else {
-        toolPath = SettingsManager::instance().getKey<QString>("hashcatPath");
-        if (toolPath.isEmpty()) {
-            QMessageBox::warning(this, tr("Queue Attack"),
-                                 tr("Configure the hashcat path in Settings before queuing a job."));
-            return false;
-        }
-        toolVersion = probeHashcatVersion(toolPath);
+    // ToolchainService is the single authority: it resolves the engine the same
+    // way the backend was constructed (settings -> portable -> PATH) and probes
+    // its version, so the recorded provenance matches the tool that runs.
+    forensic::QtProcessRunner runner;
+    const auto resolved = makeToolchainService(&runner).resolveEngine(engineId);
+    if (!resolved.available) {
+        QMessageBox::warning(this, tr("Queue Attack"),
+                             tr("The %1 engine is not available.\n\n%2")
+                                 .arg(engineId, resolved.reason));
+        return false;
     }
+    toolPath = resolved.path;
+    toolVersion = resolved.version;
     return true;
 }
 
@@ -923,15 +852,13 @@ void ForensicWindow::zipCryptoAttackSelected()
     if (dlg.exec() != QDialog::Accepted)
         return; // cancelled
 
-    const QString toolPath = SettingsManager::instance().getKey<QString>("bkcrackPath");
-    if (toolPath.isEmpty()) {
-        QMessageBox::warning(this, tr("ZipCrypto Attack"),
-                             tr("Configure the bkcrack path in Settings before queuing a job."));
+    // Resolve bkcrack through the same authority as every other engine.
+    QString toolPath, toolVersion;
+    if (!resolveEngineTool(QStringLiteral("bkcrack"), toolPath, toolVersion))
         return;
-    }
     // The controller builds and persists the reproducible bkcrack job; it refuses
     // (via recoveryRefused) if the spec cannot be turned into a command.
-    m_recovery->queueBkcrackJob(dlg.plannedSpec(), item.id, toolPath, probeBkcrackVersion(toolPath));
+    m_recovery->queueBkcrackJob(dlg.plannedSpec(), item.id, toolPath, toolVersion);
     m_tabs->setCurrentIndex(1); // show the Jobs tab
 }
 
