@@ -85,11 +85,18 @@ private:
     void setState(const QUuid &id, JobState state);
     JobExecutionBackend::StartOptions optionsFor(const QUuid &id, bool restore) const;
     void connectBackend(JobExecutionBackend *backend);
+    // The backend that must run this job, or nullptr when the job's engineId is
+    // non-empty and unrecognized. An empty engineId (legacy in-memory job) or the
+    // default engine's id maps to the default backend; every other id must be a
+    // registered backend. Unknown ids return nullptr so the queue fails closed
+    // rather than silently running the wrong engine.
     JobExecutionBackend *backendFor(const QUuid &id) const;
     void tryStartNext();
     void releaseAndAdvance(const QUuid &finishedId);
 
     JobExecutionBackend *m_backend; // default engine backend
+    // The engineId served by the default backend; empty or this id routes there.
+    QString m_defaultEngineId = QStringLiteral("hashcat");
     QHash<QString, JobExecutionBackend *> m_backends; // engineId -> backend
     QList<CrackingJob> m_jobs;
     QHash<QUuid, JobPaths> m_paths;

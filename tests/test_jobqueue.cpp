@@ -59,6 +59,9 @@ private slots:
     void restoreNormalizesInterruptedRunningToPaused();
     void restoredPausedJobResumesWithRestoreFlag();
     void routesJobToItsEngineBackend();
+    void legacyNoEngineRoutesToDefault();
+    void hashcatEngineRoutesToDefault();
+    void unknownEngineRefusesAndDoesNotLaunch();
 };
 
 void TestJobQueue::statusMovesToRunning()
@@ -127,7 +130,7 @@ void TestJobQueue::pauseFreesQueueAndResumeRestores()
     FakeBackend backend;
     JobQueue q(&backend);
     const QUuid a = q.enqueue(job(), {});
-    const QUuid b = q.enqueue(job(), {});
+    q.enqueue(job(), {}); // second job: starts once the queue frees
     q.pause(a);
     QCOMPARE(backend.pausedCalls, (QList<QUuid>{a}));
     backend.firePaused(a);
@@ -199,6 +202,50 @@ void TestJobQueue::routesJobToItsEngineBackend()
     q.stop(id);
     QCOMPARE(john.stoppedCalls, (QList<QUuid>{id}));
     QVERIFY(hashcat.stoppedCalls.isEmpty());
+}
+
+void TestJobQueue::legacyNoEngineRoutesToDefault()
+{
+    // A legacy job carries no engineId; it must run on the default backend.
+    FakeBackend hashcat;
+    FakeBackend john;
+    JobQueue q(&hashcat);
+    q.registerBackend(QStringLiteral("john"), &john);
+
+    CrackingJob j = job(); // engineId left empty
+    const QUuid id = q.enqueue(j, {});
+    QCOMPARE(hashcat.started, (QList<QUuid>{id}));
+    QVERIFY(john.started.isEmpty());
+}
+
+void TestJobQueue::hashcatEngineRoutesToDefault()
+{
+    // "hashcat" is served by the default backend (it is never registered).
+    FakeBackend hashcat;
+    JobQueue q(&hashcat);
+    CrackingJob j = job();
+    j.engineId = QStringLiteral("hashcat");
+    const QUuid id = q.enqueue(j, {});
+    QCOMPARE(hashcat.started, (QList<QUuid>{id}));
+}
+
+void TestJobQueue::unknownEngineRefusesAndDoesNotLaunch()
+{
+    // An unknown engineId must NOT fall back to hashcat: the job fails and no
+    // backend is launched.
+    FakeBackend hashcat;
+    FakeBackend john;
+    JobQueue q(&hashcat);
+    q.registerBackend(QStringLiteral("john"), &john);
+
+    CrackingJob j = job();
+    j.engineId = QStringLiteral("nonsense");
+    const QUuid id = q.enqueue(j, {});
+
+    QCOMPARE(q.jobById(id).state, JobState::Failed);
+    QVERIFY(hashcat.started.isEmpty());
+    QVERIFY(john.started.isEmpty());
+    QVERIFY(q.jobById(id).result.contains(QStringLiteral("Unknown recovery engine")));
 }
 
 QTEST_GUILESS_MAIN(TestJobQueue)

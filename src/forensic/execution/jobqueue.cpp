@@ -44,8 +44,14 @@ JobExecutionBackend *JobQueue::backendFor(const QUuid &id) const
 {
     const int i = indexOf(id);
     if (i < 0)
+        return nullptr;
+    const QString engineId = m_jobs.at(i).engineId;
+    // Empty (legacy in-memory job) or the default engine's id -> default backend.
+    if (engineId.isEmpty() || engineId == m_defaultEngineId)
         return m_backend;
-    return m_backends.value(m_jobs.at(i).engineId, m_backend);
+    // Every other engineId must be registered; an unknown one fails closed
+    // (nullptr) so we never route to hashcat merely because it is the default.
+    return m_backends.value(engineId, nullptr);
 }
 
 int JobQueue::indexOf(const QUuid &id) const
@@ -123,10 +129,19 @@ void JobQueue::tryStartNext()
     for (int i = 0; i < m_jobs.size(); ++i) {
         if (m_jobs.at(i).state == JobState::Pending) {
             const QUuid id = m_jobs.at(i).id;
+            JobExecutionBackend *backend = backendFor(id);
+            if (!backend) {
+                // Fail closed: refuse an unknown engine rather than run hashcat.
+                // Mark this job Failed and keep scanning for a runnable one.
+                m_jobs[i].result =
+                    tr("Unknown recovery engine \"%1\"; refusing to run.").arg(m_jobs.at(i).engineId);
+                setState(id, JobState::Failed);
+                continue;
+            }
             m_running = id;
             m_jobs[i].startedUtc = QDateTime::currentDateTimeUtc();
             setState(id, JobState::Preparing);
-            backendFor(id)->start(m_jobs.at(i), optionsFor(id, false));
+            backend->start(m_jobs.at(i), optionsFor(id, false));
             return;
         }
     }
@@ -226,8 +241,10 @@ void JobQueue::onFailed(const QUuid &jobId, const QString &error)
 
 void JobQueue::pause(const QUuid &jobId)
 {
-    if (indexOf(jobId) >= 0 && m_running == jobId)
-        backendFor(jobId)->pause(jobId);
+    if (indexOf(jobId) >= 0 && m_running == jobId) {
+        if (JobExecutionBackend *backend = backendFor(jobId))
+            backend->pause(jobId);
+    }
 }
 
 void JobQueue::resume(const QUuid &jobId)
@@ -237,9 +254,17 @@ void JobQueue::resume(const QUuid &jobId)
         return;
     if (!m_running.isNull())
         return; // wait until the queue is free
+    JobExecutionBackend *backend = backendFor(jobId);
+    if (!backend) {
+        // Fail closed: an unknown engine cannot be resumed onto hashcat.
+        m_jobs[i].result =
+            tr("Unknown recovery engine \"%1\"; refusing to run.").arg(m_jobs.at(i).engineId);
+        setState(jobId, JobState::Failed);
+        return;
+    }
     m_running = jobId;
     setState(jobId, JobState::Preparing);
-    backendFor(jobId)->resume(m_jobs.at(i), optionsFor(jobId, true));
+    backend->resume(m_jobs.at(i), optionsFor(jobId, true));
 }
 
 void JobQueue::stop(const QUuid &jobId)
@@ -248,7 +273,8 @@ void JobQueue::stop(const QUuid &jobId)
     if (i < 0)
         return;
     if (m_running == jobId) {
-        backendFor(jobId)->stop(jobId);
+        if (JobExecutionBackend *backend = backendFor(jobId))
+            backend->stop(jobId);
     } else if (m_jobs.at(i).state == JobState::Pending || m_jobs.at(i).state == JobState::Paused) {
         setState(jobId, JobState::Stopped);
     }
