@@ -21,6 +21,7 @@ jobs:
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-python
             zip
 
       - name: Build
@@ -52,6 +53,36 @@ jobs:
             --no-compiler-runtime \
             --no-opengl-sw \
             --no-ffmpeg
+
+      - name: Provision approved wordlists (optional)
+        shell: msys2 {0}
+        run: |
+          # RELEASE-TIME PROVISIONING HOOK. Repository policy keeps password data
+          # out of source control, so the built-in wordlist FILES are not in the
+          # checkout -- only the manifest that declares them. A maintainer who
+          # ships the approved, appropriately licensed lists wires their retrieval
+          # in here (e.g. fetch from a secure internal store) so the files land at
+          #   resources/dictionaries/casekey-common.txt
+          #   resources/dictionaries/casekey-quick.txt
+          # By default this is a no-op: the release ships the manifest only and
+          # CaseKey shows each entry as "file not supplied" (it never fabricates
+          # candidates). See resources/dictionaries/README.md.
+          echo "No release-time wordlist provisioning configured; shipping manifest only."
+
+      - name: Bundle managed dictionaries
+        shell: msys2 {0}
+        run: |
+          # Package the dictionaries directory next to the binary, matching the
+          # runtime search path (<appDir>/dictionaries/manifest.json). The manifest
+          # (and README) are always included; any provisioned .txt files are too.
+          dest="casekey-${{ github.ref_name }}/dictionaries"
+          mkdir -p "$dest"
+          cp resources/dictionaries/manifest.json "$dest/"
+          cp resources/dictionaries/README.md "$dest/"
+          cp resources/dictionaries/*.txt "$dest/" 2>/dev/null || true
+          # Fail the release if any dictionary declared "required" was not
+          # provisioned, rather than shipping a built-in that is promised but absent.
+          python tools/check_release_dictionaries.py "$dest"
 
       - name: Zip release artifacts
         shell: msys2 {0}
