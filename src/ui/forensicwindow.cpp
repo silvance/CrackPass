@@ -52,6 +52,8 @@
 #include <QClipboard>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QFont>
+#include <QStackedWidget>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -162,7 +164,40 @@ ForensicWindow::ForensicWindow(QWidget *parent)
     connect(toolbar->addAction(tr("Settings...")), &QAction::triggered, this, &ForensicWindow::openForensicSettings);
     connect(toolbar->addAction(tr("Tool Status...")), &QAction::triggered, this, &ForensicWindow::openDependencyDoctor);
 
-    auto *central = new QWidget(this);
+    // The window shows a welcome screen until a case is open, then the case
+    // view (evidence / jobs / results). This keeps first contact uncluttered.
+    m_rootStack = new QStackedWidget(this);
+
+    // Page 0: welcome / empty state.
+    auto *welcome = new QWidget(m_rootStack);
+    auto *wl = new QVBoxLayout(welcome);
+    wl->addStretch();
+    auto *title = new QLabel(tr("CaseKey"), welcome);
+    QFont titleFont = title->font();
+    titleFont.setPointSize(titleFont.pointSize() + 10);
+    titleFont.setBold(true);
+    title->setFont(titleFont);
+    title->setAlignment(Qt::AlignHCenter);
+    wl->addWidget(title);
+    auto *subtitle = new QLabel(tr("Forensic Password Recovery"), welcome);
+    subtitle->setAlignment(Qt::AlignHCenter);
+    wl->addWidget(subtitle);
+    wl->addSpacing(24);
+    auto *wbtns = new QHBoxLayout;
+    wbtns->addStretch();
+    auto *newBtn = new QPushButton(tr("New Case"), welcome);
+    connect(newBtn, &QPushButton::clicked, this, &ForensicWindow::newCase);
+    wbtns->addWidget(newBtn);
+    auto *openBtn = new QPushButton(tr("Open Existing Case"), welcome);
+    connect(openBtn, &QPushButton::clicked, this, &ForensicWindow::openCase);
+    wbtns->addWidget(openBtn);
+    wbtns->addStretch();
+    wl->addLayout(wbtns);
+    wl->addStretch();
+    m_rootStack->addWidget(welcome);
+
+    // Page 1: the open-case view.
+    auto *central = new QWidget(m_rootStack);
     auto *layout = new QVBoxLayout(central);
 
     m_caseLabel = new QLabel(tr("No case open. Create or open a case to begin."), central);
@@ -174,8 +209,9 @@ ForensicWindow::ForensicWindow(QWidget *parent)
     m_tabs->addTab(buildJobsTab(), tr("Jobs"));
     m_tabs->addTab(buildResultsTab(), tr("Results"));
     layout->addWidget(m_tabs);
+    m_rootStack->addWidget(central);
 
-    setCentralWidget(central);
+    setCentralWidget(m_rootStack);
 
     // Execution: one attached hashcat backend + a serial job queue. The queue
     // never starts anything not explicitly enqueued by the examiner.
@@ -215,6 +251,7 @@ ForensicWindow::ForensicWindow(QWidget *parent)
     connect(m_queue, &JobQueue::credentialRecovered, this, &ForensicWindow::onCredentialRecovered);
 
     setCaseActionsEnabled(false);
+    updateWelcomeVisibility(); // start on the welcome screen
 }
 
 ForensicWindow::~ForensicWindow() = default;
@@ -240,6 +277,11 @@ QWidget *ForensicWindow::buildEvidenceTab()
     buttonRow->addWidget(m_bkcrackButton);
     buttonRow->addStretch();
     layout->addLayout(buttonRow);
+
+    m_evidenceEmptyHint = new QLabel(tr("No artifacts have been added.\nUse “Add Artifact…” to begin."), w);
+    m_evidenceEmptyHint->setAlignment(Qt::AlignCenter);
+    m_evidenceEmptyHint->setStyleSheet(QStringLiteral("color:#666;padding:24px;"));
+    layout->addWidget(m_evidenceEmptyHint);
 
     m_table = new QTableWidget(0, 7, w);
     m_table->setHorizontalHeaderLabels(
@@ -331,6 +373,13 @@ void ForensicWindow::setCaseActionsEnabled(bool enabled)
     m_bkcrackButton->setEnabled(enabled);
 }
 
+void ForensicWindow::updateWelcomeVisibility()
+{
+    // Show the welcome screen until a case is open, then the case view.
+    if (m_rootStack)
+        m_rootStack->setCurrentIndex(m_workspace ? 1 : 0);
+}
+
 void ForensicWindow::newCase()
 {
     bool ok = false;
@@ -361,6 +410,7 @@ void ForensicWindow::newCase()
     setCaseActionsEnabled(true);
     refreshCaseHeader();
     reloadEvidenceTable();
+    updateWelcomeVisibility(); // reveal the case view
 }
 
 void ForensicWindow::openCase()
@@ -654,6 +704,10 @@ void ForensicWindow::reloadEvidenceTable()
     }
     m_table->resizeColumnsToContents();
     m_table->horizontalHeader()->setStretchLastSection(true);
+    // Empty-state hint: show it only when the case has no artifacts yet.
+    if (m_evidenceEmptyHint)
+        m_evidenceEmptyHint->setVisible(items.isEmpty());
+    m_table->setVisible(!items.isEmpty());
 }
 
 void ForensicWindow::appendEvidenceRow(int row)

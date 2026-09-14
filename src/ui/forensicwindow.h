@@ -11,6 +11,7 @@
 
 class QLabel;
 class QPushButton;
+class QStackedWidget;
 class QTableWidget;
 class QTabWidget;
 
@@ -82,7 +83,11 @@ private:
     forensic::JobQueue *m_queue = nullptr;
     forensic::RecoveryController *m_recovery = nullptr;
 
+    void updateWelcomeVisibility();
+
+    QStackedWidget *m_rootStack = nullptr; // welcome screen vs. the open-case view
     QLabel *m_caseLabel = nullptr;
+    QLabel *m_evidenceEmptyHint = nullptr; // shown in the Evidence tab when empty
     QPushButton *m_addButton = nullptr;
     QPushButton *m_extractButton = nullptr;
     QPushButton *m_planButton = nullptr;
