@@ -5,6 +5,7 @@
 #include "bkcrackexecutionbackend.h"
 
 #include "hashcatstatus.h"
+#include "processcontrol.h"
 
 #include <QProcess>
 #include <QRegularExpression>
@@ -89,6 +90,7 @@ void BkcrackExecutionBackend::launch(const QUuid &jobId)
 
     auto *proc = new QProcess(this);
     ctx->proc = proc;
+    configureForGracefulStop(proc); // Windows: own process group for CTRL_BREAK
     if (!ctx->opts.workingDir.isEmpty())
         proc->setWorkingDirectory(ctx->opts.workingDir);
     proc->setProgram(programFor(ctx->job, m_program));
@@ -172,9 +174,12 @@ void BkcrackExecutionBackend::requestShutdown(const QUuid &jobId, Pending kind)
     if (!ctx || !ctx->proc)
         return;
     ctx->pending = kind;
-    // bkcrack has no restore file to preserve, so a plain terminate (then a
-    // forced kill if it does not exit) is all that is needed.
-    ctx->proc->terminate();
+    // bkcrack has no restore file to preserve, so there is no checkpoint to
+    // flush -- but the stop request must still reach a console process. On
+    // Windows a plain terminate() does not, so we use the same graceful signal
+    // (console CTRL_BREAK) which promptly ends bkcrack; POSIX sends SIGTERM. A
+    // forced kill still follows if it does not exit within the grace period.
+    requestGracefulStop(ctx->proc);
     QProcess *proc = ctx->proc;
     QTimer::singleShot(kGraceMs, proc, [proc]() {
         if (proc->state() != QProcess::NotRunning)

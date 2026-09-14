@@ -92,8 +92,18 @@ continue on unverifiable state.
 hashcat has no reliable out-of-console live "pause", so CaseKey uses hashcat's
 supported **session/restore** mechanism and distinguishes:
 
-- **Graceful stop** — `QProcess::terminate()` (SIGTERM). hashcat aborts and
-  writes its `--session` restore file. State → `Stopped`.
+- **Graceful stop** — a platform-appropriate graceful signal
+  (`requestGracefulStop`, `src/forensic/execution/processcontrol.cpp`). hashcat
+  aborts and writes its `--session` restore file (John writes its `.rec`).
+  State → `Stopped`.
+    - *POSIX:* `QProcess::terminate()` (SIGTERM), which hashcat and John trap to
+      save their session.
+    - *Windows:* a console **CTRL_BREAK** delivered to the engine's own process
+      group. `QProcess::terminate()` posts WM_CLOSE, which a console engine has
+      no window to receive, so it is bypassed. The engine is launched in a new
+      process group (`configureForGracefulStop`) so the event reaches only it
+      and its children, never the GUI; hashcat/John install console handlers
+      that checkpoint and exit on that event.
 - **Pause** — same graceful shutdown, but semantically resumable; the restore
   file is retained. State → `Paused`.
 - **Forced termination** — if the process does not exit within a grace period
@@ -110,10 +120,16 @@ supported **session/restore** mechanism and distinguishes:
   not start in this process. Restore never auto-starts a job — the examiner
   resumes explicitly.
 
-> Known limitation: on Windows, delivering a graceful signal to a console
-> process may require a Ctrl-C/`GenerateConsoleCtrlEvent` path; until that is
-> added, a Windows "stop" may fall through to the forced kill (restore not
-> guaranteed). This is documented rather than hidden.
+> Best-effort caveat (Windows): the console CTRL_BREAK path is inherently
+> best-effort. It temporarily attaches to the engine's console to raise the
+> event, and if any step fails (no console, attach denied) it falls back to
+> `terminate()` and then the forced kill — in which case the restore/session is
+> not guaranteed, exactly as on a forced termination. The engine must also honor
+> CTRL_BREAK (current hashcat and John Jumbo do). This path cannot be exercised
+> on the Linux CI runners, so it is validated **manually on Windows**: start a
+> long recovery, pause it, confirm the `.restore`/`.rec` session is written and
+> that resume continues rather than restarting. bkcrack has no checkpoint, so a
+> stop simply ends it and resume restarts from the beginning (stated plainly).
 
 ## 6. Persistence safety
 

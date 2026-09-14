@@ -84,6 +84,8 @@ add_library(forensic_core STATIC
     src/forensic/execution/crackedplain.h
     src/forensic/execution/crackedplain.cpp
     src/forensic/execution/jobexecutionbackend.h
+    src/forensic/execution/processcontrol.h
+    src/forensic/execution/processcontrol.cpp
     src/forensic/execution/jobqueue.h
     src/forensic/execution/jobqueue.cpp
     src/forensic/execution/hashcatexecutionbackend.h

@@ -6,6 +6,7 @@
 
 #include "hashcatstatusparser.h"
 #include "crackedplain.h"
+#include "processcontrol.h"
 
 #include <QFile>
 #include <QFileInfo>
@@ -63,6 +64,7 @@ void HashcatExecutionBackend::launch(const QUuid &jobId, bool restore)
 
     auto *proc = new QProcess(this);
     ctx->proc = proc;
+    configureForGracefulStop(proc); // Windows: own process group for CTRL_BREAK
     if (!ctx->opts.workingDir.isEmpty())
         proc->setWorkingDirectory(ctx->opts.workingDir);
     // Execute the binary recorded on the job so the process we run is exactly the
@@ -168,11 +170,11 @@ void HashcatExecutionBackend::requestShutdown(const QUuid &jobId, Pending kind)
     if (!ctx || !ctx->proc)
         return;
     ctx->pending = kind;
-    // Graceful first: SIGTERM lets hashcat write its restore/session file so the
-    // job can be resumed. If it does not exit within the grace period we force
-    // a kill so a hung process cannot wedge the queue (no restore is guaranteed
-    // in that forced case).
-    ctx->proc->terminate();
+    // Graceful first (SIGTERM on POSIX, console CTRL_BREAK on Windows) lets
+    // hashcat write its restore/session file so the job can be resumed. If it
+    // does not exit within the grace period we force a kill so a hung process
+    // cannot wedge the queue (no restore is guaranteed in that forced case).
+    requestGracefulStop(ctx->proc);
     QProcess *proc = ctx->proc;
     QTimer::singleShot(kGraceMs, proc, [proc]() {
         if (proc->state() != QProcess::NotRunning)
