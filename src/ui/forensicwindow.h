@@ -79,7 +79,8 @@ private:
     // running extraction (and prompting for the mode) if needed. Returns true and
     // fills the hash file + type name when ready; false (after explaining) if not.
     bool ensureExtractedHash(const forensic::EvidenceItem &item,
-                             quint32 &modeOut, QString &hashFileOut, QString &hashTypeNameOut);
+                             quint32 &modeOut, QString &hashFileOut, QString &hashTypeNameOut,
+                             QUuid &extractionIdOut);
     // Resolve the configured binary + version for an engine ("hashcat"/"john"),
     // warning and returning false when the path is not configured.
     bool resolveEngineTool(const QString &engineId, QString &toolPath, QString &toolVersion);
@@ -87,7 +88,7 @@ private:
     // it plans. Shared by "Plan Attack…" and the wizard's Guided strategy.
     void openAdvancedPlanner(const forensic::EvidenceItem &item, quint32 mode,
                              const QString &hashTypeName, const QString &hashFile,
-                             const QString &planDir);
+                             const QString &planDir, const QUuid &extractionId);
     // Build the managed dictionary library (bundled manifest + user library dir).
     forensic::DictionaryLibrary makeDictionaryLibrary() const;
 

@@ -32,6 +32,35 @@ private slots:
     void jsonAndHtmlContainKeyFields();
     void reportCarriesDictionaryProvenance();
     void redactionHidesPlaintext();
+    void reportPrefersJobExtractionId();
+    void legacyJobFallsBackToNewestExtraction();
+
+private:
+    // Add one artifact and two successful extractions (older then newer) for it,
+    // returning the evidence id and each extraction's id. `newer` is created
+    // strictly after `older`.
+    static QUuid seedTwoExtractions(CaseWorkspace *ws, QTemporaryDir &src,
+                                    QUuid &olderOut, QUuid &newerOut)
+    {
+        auto intake = ws->addEvidence([&] {
+            const QString p = src.filePath("multi.pdf");
+            QFile f(p); f.open(QIODevice::WriteOnly); f.write("%PDF-1.6\n/Encrypt"); f.close();
+            return p;
+        }());
+        auto extractWith = [&](const QString &version) -> QUuid {
+            FakeProcessRunner runner;
+            runner.nextResult = FakeProcessRunner::ok("multi.pdf:$pdf$2*3*128*abc\n");
+            ToolResolver tools;
+            tools.setTool("pdf2john", ResolvedTool{true, "pdf2john", {}, version});
+            ExtractionContext ctx; ctx.runner = &runner; ctx.tools = &tools;
+            auto outcome = ws->extractHash(intake.item.id, ctx);
+            return outcome.record.id;
+        };
+        olderOut = extractWith(QStringLiteral("vA"));
+        QTest::qSleep(15); // guarantee a strictly newer endedUtc for the second
+        newerOut = extractWith(QStringLiteral("vB"));
+        return intake.item.id;
+    }
 };
 
 // Builds a case with an artifact, an extraction, a job, and a recovered
@@ -176,6 +205,79 @@ void TestReportBuilder::redactionHidesPlaintext()
     QVERIFY(html.contains("[REDACTED]"));
     const QByteArray json = ReportRenderer::toJson(r);
     QVERIFY(!json.contains("letmein"));
+}
+
+// An artifact with several extractions: the report must name the EXACT one the
+// job was bound to, even when it is not the newest. Reopen the case first.
+void TestReportBuilder::reportPrefersJobExtractionId()
+{
+    QTemporaryDir caseDir, src;
+    QString root;
+    QUuid jobId, olderId, newerId, evId;
+    {
+        auto ws = CaseWorkspace::create(caseDir.path(), CaseInfo{});
+        QVERIFY(ws);
+        root = ws->rootPath();
+        evId = seedTwoExtractions(ws.get(), src, olderId, newerId);
+
+        CrackingJob job;
+        job.id = QUuid::createUuid();
+        job.caseId = ws->info().id;
+        job.evidenceId = evId;
+        job.extractionId = olderId; // bound to the OLDER extraction on purpose
+        job.hashMode = 10500;
+        job.state = JobState::Recovered;
+        job.startedUtc = QDateTime::currentDateTimeUtc();
+        job.endedUtc = job.startedUtc.addSecs(1);
+        QVERIFY(ws->saveJob(job));
+        jobId = job.id;
+    }
+
+    auto ws = CaseWorkspace::open(root);
+    QVERIFY(ws);
+    CrackingJob job;
+    for (const CrackingJob &j : ws->jobs())
+        if (j.id == jobId) job = j;
+    QCOMPARE(job.extractionId, olderId); // survived serialization + reopen
+
+    const RecoveryReport r = ReportBuilder::build(*ws, job, "x");
+    QCOMPARE(r.extractionId, olderId.toString(QUuid::WithoutBraces));
+    QCOMPARE(r.extractorVersion, QStringLiteral("vA")); // the bound one, not newest ("vB")
+}
+
+// A legacy job carries no extractionId: the report deterministically uses the
+// NEWEST successful extraction for the artifact, not list/registration order.
+void TestReportBuilder::legacyJobFallsBackToNewestExtraction()
+{
+    QTemporaryDir caseDir, src;
+    QString root;
+    QUuid jobId, olderId, newerId, evId;
+    {
+        auto ws = CaseWorkspace::create(caseDir.path(), CaseInfo{});
+        QVERIFY(ws);
+        root = ws->rootPath();
+        evId = seedTwoExtractions(ws.get(), src, olderId, newerId);
+
+        CrackingJob job;
+        job.id = QUuid::createUuid();
+        job.caseId = ws->info().id;
+        job.evidenceId = evId; // extractionId left null (legacy record)
+        job.hashMode = 10500;
+        job.state = JobState::Recovered;
+        QVERIFY(ws->saveJob(job));
+        jobId = job.id;
+    }
+
+    auto ws = CaseWorkspace::open(root);
+    QVERIFY(ws);
+    CrackingJob job;
+    for (const CrackingJob &j : ws->jobs())
+        if (j.id == jobId) job = j;
+    QVERIFY(job.extractionId.isNull());
+
+    const RecoveryReport r = ReportBuilder::build(*ws, job, "x");
+    QCOMPARE(r.extractionId, newerId.toString(QUuid::WithoutBraces));
+    QCOMPARE(r.extractorVersion, QStringLiteral("vB")); // newest successful
 }
 
 QTEST_GUILESS_MAIN(TestReportBuilder)

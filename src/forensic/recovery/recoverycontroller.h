@@ -53,10 +53,13 @@ public:
     // `toolPath`/`toolVersion` record the resolved binary for provenance. As the
     // queue runs the job, state transitions and any recovered credential are
     // written to the case.
+    // `extractionId` binds the job to the exact Extraction whose hash it attacks
+    // (null when the attack does not come from a *2john extraction).
     QUuid queueRecoveryJob(const AttackJobSpec &spec, const QUuid &evidenceId,
                            const QString &toolPath, const QString &toolVersion = QString(),
                            const QString &engineId = RecoveryEngineRegistry::defaultEngineId(),
-                           const DictionaryProvenance &dictionary = DictionaryProvenance{});
+                           const DictionaryProvenance &dictionary = DictionaryProvenance{},
+                           const QUuid &extractionId = QUuid());
 
     // Build and enqueue a bkcrack (ZipCrypto known-plaintext) job from its own
     // spec, returning its id. bkcrack does not fit the hashcat-shaped
@@ -75,7 +78,8 @@ public:
     // Exposed for reuse/testing. The engine supplies the job's engineId and argv.
     static CrackingJob buildJob(const RecoveryEngine &engine, const AttackJobSpec &spec,
                                 const QString &caseId, const QUuid &evidenceId,
-                                const QString &toolPath, const QString &toolVersion);
+                                const QString &toolPath, const QString &toolVersion,
+                                const QUuid &extractionId = QUuid());
     static JobQueue::JobPaths buildPaths(const QString &jobDir, const QUuid &jobId);
 
 signals:

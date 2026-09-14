@@ -46,12 +46,14 @@ RecoveryController::RecoveryController(JobQueue *queue, QObject *parent)
 
 CrackingJob RecoveryController::buildJob(const RecoveryEngine &engine, const AttackJobSpec &spec,
                                          const QString &caseId, const QUuid &evidenceId,
-                                         const QString &toolPath, const QString &toolVersion)
+                                         const QString &toolPath, const QString &toolVersion,
+                                         const QUuid &extractionId)
 {
     CrackingJob job;
     job.id = QUuid::createUuid();
     job.caseId = caseId;
     job.evidenceId = evidenceId;
+    job.extractionId = extractionId;
     job.hashMode = spec.hashMode;
     job.attackMode = spec.attackMode;
     job.engineId = engine.id();
@@ -81,7 +83,8 @@ JobQueue::JobPaths RecoveryController::buildPaths(const QString &jobDir, const Q
 QUuid RecoveryController::queueRecoveryJob(const AttackJobSpec &spec, const QUuid &evidenceId,
                                            const QString &toolPath, const QString &toolVersion,
                                            const QString &engineId,
-                                           const DictionaryProvenance &dictionary)
+                                           const DictionaryProvenance &dictionary,
+                                           const QUuid &extractionId)
 {
     if (!m_workspace) {
         emit recoveryRefused(tr("No case is open."));
@@ -102,7 +105,7 @@ QUuid RecoveryController::queueRecoveryJob(const AttackJobSpec &spec, const QUui
     }
 
     CrackingJob job = buildJob(*engine, spec, m_workspace->info().id, evidenceId,
-                               toolPath, toolVersion);
+                               toolPath, toolVersion, extractionId);
     job.dictionary = dictionary; // provenance of the managed dictionary, if any
     return persistThenEnqueue(job);
 }
