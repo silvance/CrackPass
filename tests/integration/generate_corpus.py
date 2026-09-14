@@ -30,12 +30,18 @@ def run(args, **kw):
 def main(outdir):
     os.makedirs(outdir, exist_ok=True)
     fixtures = []
+    bkcrack = []
     made, skipped = [], []
 
     def add(name, typ, encrypted, password=None, note=""):
         fixtures.append({"file": name, "type": typ, "encrypted": encrypted,
                          "password": password, "note": note})
         made.append(name)
+
+    def add_bkcrack(name, entry, plain_file, note=""):
+        bkcrack.append({"file": name, "entry": entry, "plainFile": plain_file,
+                        "note": note})
+        made.append(name + " (bkcrack)")
 
     plain_src = os.path.join(outdir, "_plain_source.txt")
     with open(plain_src, "w", encoding="utf-8") as f:
@@ -64,8 +70,23 @@ def main(outdir):
         mis = os.path.join(outdir, "zip_as.pdf")
         run(["zip", "-j", "-P", PW_SIMPLE, mis, plain_src])
         add("zip_as.pdf", "zip", True, PW_SIMPLE, "misleading extension (zip named .pdf)")
+
+        # bkcrack (ZipCrypto known-plaintext) fixture: a traditional PKWARE
+        # ZipCrypto archive plus the known plaintext of one of its entries.
+        # `zip -P` produces ZipCrypto (not AES), which is exactly what bkcrack's
+        # known-plaintext cryptanalysis attacks. The entry name is the junked
+        # basename of the source we compressed.
+        bkzip = os.path.join(outdir, "bkcrack_zipcrypto.zip")
+        if os.path.exists(bkzip):
+            os.remove(bkzip)
+        run(["zip", "-j", "-P", PW_SIMPLE, bkzip, plain_src])
+        plain_copy = "bkcrack_plain.txt"
+        shutil.copyfile(plain_src, os.path.join(outdir, plain_copy))
+        add_bkcrack("bkcrack_zipcrypto.zip", os.path.basename(plain_src),
+                    plain_copy, "ZipCrypto known-plaintext")
     else:
         skipped.append("zip (install `zip`)")
+        skipped.append("bkcrack fixture (needs `zip` to build a ZipCrypto archive)")
 
     # --- 7-Zip via `7z`/`7za` ---
     sevenzip = "7z" if have("7z") else ("7za" if have("7za") else None)
@@ -110,9 +131,14 @@ def main(outdir):
         skipped.append("rar (proprietary; drop in a .rar made with `rar a -p` manually)")
     if not (have("keepassxc-cli")):
         skipped.append("keepass-kdbx (drop in a .kdbx made with keepassxc-cli manually)")
+    # BitLocker cannot be synthesized offline here; drop in an image manually and
+    # add a {file,type:"bitlocker",encrypted:true,password} entry -- it rides the
+    # standard chain via bitlocker2john + hashcat -m 22100 (and John).
+    skipped.append("bitlocker (drop in a BitLocker image + a 'bitlocker' manifest entry manually)")
 
     with open(os.path.join(outdir, "manifest.json"), "w", encoding="utf-8") as f:
-        json.dump({"fixtures": fixtures}, f, indent=2, ensure_ascii=False)
+        json.dump({"fixtures": fixtures, "bkcrack": bkcrack}, f, indent=2,
+                  ensure_ascii=False)
 
     print(f"Corpus written to {outdir}")
     print(f"  produced: {', '.join(made) or '(none)'}")
@@ -120,6 +146,8 @@ def main(outdir):
     print("Set CASEKEY_CORPUS to this directory to enable the integration test.")
     print("For skipped formats, add a fixture file + a manifest.json entry "
           "{file,type,encrypted,password} manually.")
+    print("bkcrack fixtures live in the manifest's \"bkcrack\" array as "
+          "{file,entry,plainFile[,keysContain]}.")
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:

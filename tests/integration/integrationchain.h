@@ -33,18 +33,38 @@ struct FixtureSpec {
     QString expectedPassword; // may be empty for non-encrypted/malformed
 };
 
+// A bkcrack (ZipCrypto known-plaintext) fixture: an encrypted ZIP, the entry to
+// attack, and a known-plaintext file for that entry.
+struct BkcrackFixtureSpec {
+    QString zipPath;        // encrypted ZIP archive
+    QString targetEntry;    // ZipCrypto entry to attack
+    QString plainFile;      // known plaintext for that entry
+    QString expectedContains; // optional: substring the recovered keys must contain
+};
+
 // Runs: detect -> encryption probe -> real extraction -> mode resolution ->
-// real hashcat -> recovered password -> case association -> SHA unchanged ->
-// report. `extractorToolId` selects which *2john tool to use.
+// real recovery -> recovered password -> case association -> SHA unchanged ->
+// report. `extractorToolId` selects which *2john tool to use; `engineId`
+// selects the cracking engine ("hashcat" or "john").
 ChainResult runChain(const IntegrationEnv &env, const QString &caseParentDir,
                      const FixtureSpec &fixture, const QString &extractorToolId,
-                     int hashcatTimeoutMs = 120000);
+                     const QString &engineId = QStringLiteral("hashcat"),
+                     int recoveryTimeoutMs = 120000);
+
+// Runs the bkcrack ZipCrypto known-plaintext chain: intake -> real bkcrack ->
+// recovered internal key -> case association -> SHA unchanged. Evidence is never
+// modified.
+ChainResult runBkcrackChain(const IntegrationEnv &env, const QString &caseParentDir,
+                            const BkcrackFixtureSpec &fixture, int timeoutMs = 120000);
 
 // Maps an artifact type id to its extractor tool id.
 QString extractorForType(const QString &typeId);
 
-// Loads fixtures from <dir>/manifest.json (paths resolved against <dir>).
+// Loads password fixtures from <dir>/manifest.json (paths resolved against <dir>).
 QVector<FixtureSpec> loadCorpus(const QString &dir);
+
+// Loads bkcrack fixtures from the "bkcrack" array of <dir>/manifest.json.
+QVector<BkcrackFixtureSpec> loadBkcrackCorpus(const QString &dir);
 
 }} // namespace forensic::itest
 
