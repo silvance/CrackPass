@@ -20,8 +20,13 @@ RecoveryController::RecoveryController(JobQueue *queue, QObject *parent)
     // recovered credential is written to the current case. Display is layered on
     // separately by whoever also connects to these signals.
     connect(m_queue, &JobQueue::jobChanged, this, [this](const CrackingJob &job) {
-        if (m_workspace)
-            m_workspace->saveJob(job);
+        if (!m_workspace)
+            return;
+        // Runtime state persistence: a failure here must not corrupt the queue
+        // (the job keeps running); it is surfaced separately for the examiner.
+        QString err;
+        if (!m_workspace->saveJob(job, &err))
+            emit jobPersistenceFailed(job, err);
     });
     connect(m_queue, &JobQueue::credentialRecovered, this, [this](const RecoveredCredential &cred) {
         if (m_workspace)
@@ -87,9 +92,7 @@ QUuid RecoveryController::queueRecoveryJob(const AttackJobSpec &spec, const QUui
 
     const CrackingJob job = buildJob(*engine, spec, m_workspace->info().id, evidenceId,
                                      toolPath, toolVersion);
-    const QString jobDir = m_workspace->jobDir(job.id);
-    QDir().mkpath(jobDir);
-    return m_queue->enqueue(job, buildPaths(jobDir, job.id));
+    return persistThenEnqueue(job);
 }
 
 QUuid RecoveryController::queueBkcrackJob(const BkcrackAttackSpec &spec, const QUuid &evidenceId,
@@ -117,8 +120,29 @@ QUuid RecoveryController::queueBkcrackJob(const BkcrackAttackSpec &spec, const Q
     job.engineArgs = built.args;   // the bkcrack argv
     job.hashFile = spec.zipPath;   // the archive under attack, for reference/reporting
 
+    return persistThenEnqueue(job);
+}
+
+bool RecoveryController::persistNewJob(const CrackingJob &job)
+{
+    if (!m_workspace)
+        return false;
+    return m_workspace->saveJob(job); // atomic write + job_created audit entry
+}
+
+QUuid RecoveryController::persistThenEnqueue(const CrackingJob &job)
+{
+    // Invariant: a new job must be persisted + audited BEFORE its engine starts,
+    // so a persistence failure never leaves a running process without a case
+    // record. Build -> persist/audit -> enqueue -> execute. On failure: no
+    // launch, no phantom in-memory job, examiner told why.
     const QString jobDir = m_workspace->jobDir(job.id);
     QDir().mkpath(jobDir);
+    if (!persistNewJob(job)) {
+        emit recoveryRefused(tr("The job could not be saved to the case, so it was "
+                                "not started."));
+        return QUuid();
+    }
     return m_queue->enqueue(job, buildPaths(jobDir, job.id));
 }
 
