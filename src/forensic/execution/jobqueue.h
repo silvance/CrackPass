@@ -92,6 +92,12 @@ private:
     // rather than silently running the wrong engine.
     JobExecutionBackend *backendFor(const QUuid &id) const;
     void tryStartNext();
+    // Stamp endedUtc = now on the job. Called on a terminal transition BEFORE
+    // setState() emits jobChanged, so the persisted record already carries the
+    // final completion time (jobChanged is what triggers persistence).
+    void stampEnded(const QUuid &id);
+    // Free the running slot and start the next pending job. Does NOT touch
+    // timestamps: the terminal handler stamps endedUtc before persisting.
     void releaseAndAdvance(const QUuid &finishedId);
 
     JobExecutionBackend *m_backend; // default engine backend

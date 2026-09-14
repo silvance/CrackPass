@@ -95,11 +95,21 @@ struct CrackingJob
     DictionaryProvenance dictionary; // managed dictionary used, if any
     QVector<ComputeDevice> devices;
 
+    // Timestamp policy (single pair): startedUtc is stamped when the job is
+    // first started; endedUtc is stamped ONLY on a terminal transition
+    // (Recovered/Exhausted/Stopped/Failed) and left invalid while Pending/
+    // Preparing/Running/Paused. Pausing does NOT stamp endedUtc, and a resume
+    // clears any stale endedUtc, so a paused/resumed job never carries a
+    // premature completion time. The model keeps one pair, so runtimeMs() is
+    // wall-clock elapsed from first start to final completion and therefore
+    // includes any interval the job spent paused.
     QDateTime startedUtc;
     QDateTime endedUtc;
     JobState state = JobState::Pending;
     QString result;            // human-readable outcome summary
 
+    // Wall-clock from startedUtc to endedUtc (0 until both are set); includes
+    // paused time. See the timestamp policy above.
     qint64 runtimeMs() const;
 
     QJsonObject toJson() const;
