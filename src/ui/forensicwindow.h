@@ -9,7 +9,9 @@
 #include <QUuid>
 #include <memory>
 
+class QAction;
 class QLabel;
+class QMenu;
 class QPushButton;
 class QStackedWidget;
 class QTableWidget;
@@ -109,9 +111,13 @@ private:
     QLabel *m_caseLabel = nullptr;
     QLabel *m_evidenceEmptyHint = nullptr; // shown in the Evidence tab when empty
     QPushButton *m_addButton = nullptr;
-    QPushButton *m_extractButton = nullptr;
-    QPushButton *m_planButton = nullptr;
-    QPushButton *m_bkcrackButton = nullptr;
+    QPushButton *m_recoverButton = nullptr;
+    // The technical / specialized actions, shared between the toolbar's and the
+    // evidence tab's "Advanced" menus. Gated by setCaseActionsEnabled().
+    QAction *m_extractAction = nullptr;
+    QAction *m_planAction = nullptr;
+    QAction *m_bkcrackAction = nullptr;
+    QMenu *buildAdvancedMenu(QWidget *parent);
     QTableWidget *m_table = nullptr;
 
     QTabWidget *m_tabs = nullptr;

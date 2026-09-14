@@ -17,6 +17,7 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QStackedWidget>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 using namespace forensic;
@@ -129,11 +130,37 @@ RecoverPasswordDialog::RecoverPasswordDialog(quint32 hashMode, const QString &ha
     m_summary->setWordWrap(true);
     root->addWidget(m_summary);
 
-    m_command = new QPlainTextEdit(this);
+    // Progressive disclosure: the technical detail (hash type/mode, attack mode,
+    // engine, and the exact command) is hidden behind an "Advanced details"
+    // toggle so the primary view stays plain.
+    auto *advToggle = new QToolButton(this);
+    advToggle->setText(tr("Advanced details"));
+    advToggle->setCheckable(true);
+    advToggle->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    advToggle->setArrowType(Qt::RightArrow);
+    advToggle->setAutoRaise(true);
+    root->addWidget(advToggle, 0, Qt::AlignLeft);
+
+    m_advanced = new QWidget(this);
+    auto *advLayout = new QVBoxLayout(m_advanced);
+    advLayout->setContentsMargins(0, 0, 0, 0);
+    m_details = new QLabel(m_advanced);
+    m_details->setWordWrap(true);
+    m_details->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    m_details->setStyleSheet(QStringLiteral("color:#555;"));
+    advLayout->addWidget(m_details);
+    m_command = new QPlainTextEdit(m_advanced);
     m_command->setReadOnly(true);
     m_command->setMaximumHeight(60);
     m_command->setStyleSheet(QStringLiteral("font-family:monospace;color:#333;background:#f7f7f7;"));
-    root->addWidget(m_command);
+    advLayout->addWidget(m_command);
+    m_advanced->setVisible(false);
+    root->addWidget(m_advanced);
+
+    connect(advToggle, &QToolButton::toggled, this, [this, advToggle](bool on) {
+        m_advanced->setVisible(on);
+        advToggle->setArrowType(on ? Qt::DownArrow : Qt::RightArrow);
+    });
 
     // Buttons.
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Cancel, this);
@@ -201,6 +228,7 @@ void RecoverPasswordDialog::replan()
     m_engineId.clear();
     m_dictionaryId.clear();
     m_command->clear();
+    m_details->clear();
 
     const RecoveryStrategy strat = currentStrategy();
 
@@ -284,7 +312,22 @@ void RecoverPasswordDialog::replan()
     }
     m_summary->setText(summary);
 
-    // The exact command, for transparency (CaseKey never hides the engine).
+    // Advanced details (hidden by default): the technical breakdown and the
+    // exact command, for transparency (CaseKey never hides the engine).
+    QStringList detail;
+    detail << tr("Hash type: %1 (mode %2)")
+                  .arg(m_hashTypeName.isEmpty() ? tr("(unnamed)") : m_hashTypeName)
+                  .arg(m_spec.hashMode);
+    detail << tr("Attack mode: %1").arg(attackModeName(m_spec.attackMode));
+    detail << tr("Engine: %1 (chosen automatically)").arg(engine->displayName());
+    if (strat == RecoveryStrategy::Dictionary) {
+        bool found = false;
+        const DictionaryEntry entry = m_library.entry(m_dictionaryId, &found);
+        detail << tr("Dictionary: %1").arg(entry.absolutePath);
+        if (!entry.sha256.isEmpty())
+            detail << tr("Dictionary SHA-256: %1").arg(entry.sha256);
+    }
+    m_details->setText(detail.join(QLatin1Char('\n')));
     m_command->setPlainText(engine->displayName() + QLatin1Char(' ')
                             + engine->buildArgs(m_spec).join(QLatin1Char(' ')));
 

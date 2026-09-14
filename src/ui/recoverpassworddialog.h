@@ -80,6 +80,8 @@ private:
     QLabel *m_dictionaryInfo = nullptr;
     QLineEdit *m_mask = nullptr;
     QLabel *m_summary = nullptr;   // plain-language "what will run"
+    QWidget *m_advanced = nullptr; // collapsible technical detail (hidden by default)
+    QLabel *m_details = nullptr;   // hash type/mode, attack mode, engine, dictionary
     QPlainTextEdit *m_command = nullptr; // the exact command (transparency)
     QPushButton *m_primary = nullptr; // Start Recovery / Open Advanced Planner
 
