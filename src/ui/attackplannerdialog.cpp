@@ -138,7 +138,14 @@ AttackPlannerDialog::AttackPlannerDialog(quint32 hashMode, const QString &hashTy
 
     auto *commonRow = new QHBoxLayout;
     m_commonWordlist = new QLineEdit(this);
-    m_commonWordlist->setPlaceholderText(tr("path to a common-passwords wordlist (offline)"));
+    m_commonWordlist->setPlaceholderText(tr("path to an external wordlist (advanced/offline)"));
+    // This is the ADVANCED path: browse to an arbitrary external wordlist. The
+    // normal, managed dictionary (CaseKey Common, etc.) is chosen in the
+    // "Recover Password" workflow via the Dictionary library, not here.
+    m_commonWordlist->setToolTip(tr("Advanced: an arbitrary external wordlist. For the normal "
+                                    "workflow, use Recover Password and pick a managed "
+                                    "dictionary instead. Prefilled from the legacy default "
+                                    "wordlist setting if one is configured."));
     auto *browse = new QPushButton(tr("Browse..."), this);
     connect(browse, &QPushButton::clicked, this, [this] {
         const QString p = QFileDialog::getOpenFileName(this, tr("Select wordlist"));
@@ -146,7 +153,7 @@ AttackPlannerDialog::AttackPlannerDialog(quint32 hashMode, const QString &hashTy
     });
     commonRow->addWidget(m_commonWordlist, 1);
     commonRow->addWidget(browse);
-    form->addRow(tr("Common wordlist:"), commonRow);
+    form->addRow(tr("External wordlist (advanced):"), commonRow);
 
     m_customArgs = new QLineEdit(this);
     m_customArgs->setPlaceholderText(tr("extra hashcat args for Custom / Advanced"));

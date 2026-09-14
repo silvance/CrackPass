@@ -21,7 +21,13 @@ struct PlannerContext
     QString hashTypeName;
     QString hashFile;         // extracted-hash file to attack
     QString planDir;          // where generated wordlists/rules are written
-    QString commonWordlist;   // optional path to a bundled common-passwords list
+    // The resolved wordlist path a dictionary/hybrid template attacks. In the
+    // normal workflow this is the managed dictionary the examiner picked (the
+    // DictionaryLibrary is authoritative); in the Advanced planner it is an
+    // arbitrary external wordlist (optionally prefilled from the legacy
+    // "commonWordlist" default setting). It is a resolved path, not a second
+    // "default dictionary" concept.
+    QString commonWordlist;
     QStringList devices;      // human-readable selected devices (may be empty)
     QStringList customArgs;   // used by the Custom/Advanced template
 };
