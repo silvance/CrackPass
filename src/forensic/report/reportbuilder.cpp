@@ -36,15 +36,35 @@ RecoveryReport ReportBuilder::build(const CaseWorkspace &ws, const CrackingJob &
         }
     }
 
-    // Extraction (latest successful for this artifact) + resolved hash-mode name.
-    for (const Extraction &ex : ws.extractions()) {
-        if (ex.evidenceId != job.evidenceId)
-            continue;
-        r.extractorId = ex.extractorId;
-        r.extractorVersion = ex.extractorVersion.isEmpty() ? QStringLiteral("(not recorded)")
-                                                           : ex.extractorVersion;
-        r.extractionStatus = ex.status;
-        for (const HashcatModeOption &m : ex.candidateModes)
+    // Extraction + resolved hash-mode name. Prefer the EXACT extraction the job
+    // was bound to (job.extractionId). Legacy records written before that field
+    // existed fall back deterministically to the NEWEST successful extraction
+    // for this artifact by recorded endedUtc (tie-broken by id) -- never by
+    // filesystem/registration iteration order. (Held in a local so pointers stay
+    // valid: extractions() returns by value.)
+    const QList<Extraction> exs = ws.extractions();
+    const Extraction *chosen = nullptr;
+    if (!job.extractionId.isNull()) {
+        for (const Extraction &ex : exs)
+            if (ex.id == job.extractionId) { chosen = &ex; break; }
+    }
+    if (!chosen) { // legacy fallback: newest successful for this artifact
+        for (const Extraction &ex : exs) {
+            if (ex.evidenceId != job.evidenceId || ex.status != QStringLiteral("success"))
+                continue;
+            if (!chosen || ex.endedUtc > chosen->endedUtc
+                || (ex.endedUtc == chosen->endedUtc
+                    && ex.id.toString() > chosen->id.toString()))
+                chosen = &ex;
+        }
+    }
+    if (chosen) {
+        r.extractionId = chosen->id.toString(QUuid::WithoutBraces);
+        r.extractorId = chosen->extractorId;
+        r.extractorVersion = chosen->extractorVersion.isEmpty() ? QStringLiteral("(not recorded)")
+                                                                : chosen->extractorVersion;
+        r.extractionStatus = chosen->status;
+        for (const HashcatModeOption &m : chosen->candidateModes)
             if (m.mode == job.hashMode)
                 r.hashModeName = m.name;
     }

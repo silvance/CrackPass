@@ -38,6 +38,7 @@ struct RecoveryReport
     QString detectedType;   // detected encryption/hash type
 
     // Extraction
+    QString extractionId;   // exact Extraction record the job attacked (if known)
     QString extractorId;
     QString extractorVersion;
     QString extractionStatus;

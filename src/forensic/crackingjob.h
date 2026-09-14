@@ -69,6 +69,12 @@ struct CrackingJob
     QUuid id;
     QString caseId;
     QUuid evidenceId;
+    // The exact Extraction record whose hash this job attacks. Bound at job
+    // creation so a report names the precise extraction used, even when an
+    // artifact has several. Null for jobs that do not derive from a *2john
+    // extraction (e.g. a bkcrack ZipCrypto attack) and for legacy records
+    // written before this field existed (see ReportBuilder for the fallback).
+    QUuid extractionId;
 
     quint32 hashMode = 0;
     int attackMode = 0;

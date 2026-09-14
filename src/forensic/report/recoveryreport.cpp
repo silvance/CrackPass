@@ -26,6 +26,7 @@ QJsonObject RecoveryReport::toJson() const
     artifact[QStringLiteral("detectedType")] = detectedType;
 
     QJsonObject extraction;
+    extraction[QStringLiteral("extractionId")] = extractionId;
     extraction[QStringLiteral("extractorId")] = extractorId;
     extraction[QStringLiteral("extractorVersion")] = extractorVersion;
     extraction[QStringLiteral("status")] = extractionStatus;

@@ -582,7 +582,8 @@ void ForensicWindow::extractSelected()
 }
 
 bool ForensicWindow::ensureExtractedHash(const EvidenceItem &item, quint32 &modeOut,
-                                         QString &hashFileOut, QString &hashTypeNameOut)
+                                         QString &hashFileOut, QString &hashTypeNameOut,
+                                         QUuid &extractionIdOut)
 {
     // A helper to locate the most recent successful extraction for this artifact
     // with a resolved mode.
@@ -668,6 +669,7 @@ bool ForensicWindow::ensureExtractedHash(const EvidenceItem &item, quint32 &mode
     }
 
     modeOut = chosen.selectedMode;
+    extractionIdOut = chosen.id; // bind the job to this exact extraction
     hashFileOut = QDir(m_workspace->extractionsDir())
                       .filePath(chosen.id.toString(QUuid::WithoutBraces) + "/hash.txt");
     hashTypeNameOut.clear();
@@ -728,7 +730,7 @@ forensic::DictionaryLibrary ForensicWindow::makeDictionaryLibrary() const
 
 void ForensicWindow::openAdvancedPlanner(const EvidenceItem &item, quint32 mode,
                                          const QString &hashTypeName, const QString &hashFile,
-                                         const QString &planDir)
+                                         const QString &planDir, const QUuid &extractionId)
 {
     AttackPlannerDialog dlg(mode, hashTypeName, hashFile, planDir, this);
     dlg.exec();
@@ -744,7 +746,8 @@ void ForensicWindow::openAdvancedPlanner(const EvidenceItem &item, quint32 mode,
     // The controller builds the reproducible job, lays out its session files,
     // enqueues it, and persists the record + later state/credentials. It refuses
     // (via recoveryRefused) if the engine cannot express the attack.
-    m_recovery->queueRecoveryJob(dlg.plannedSpec(), item.id, toolPath, toolVersion, dlg.plannedEngineId());
+    m_recovery->queueRecoveryJob(dlg.plannedSpec(), item.id, toolPath, toolVersion,
+                                 dlg.plannedEngineId(), forensic::DictionaryProvenance{}, extractionId);
     m_tabs->setCurrentIndex(1); // show the Jobs tab
 }
 
@@ -761,7 +764,8 @@ void ForensicWindow::recoverPasswordSelected()
 
     quint32 mode = 0;
     QString hashFile, hashTypeName;
-    if (!ensureExtractedHash(item, mode, hashFile, hashTypeName))
+    QUuid extractionId;
+    if (!ensureExtractedHash(item, mode, hashFile, hashTypeName, extractionId))
         return; // reason already explained
 
     const QString planDir = QDir(m_workspace->jobsDir())
@@ -774,7 +778,7 @@ void ForensicWindow::recoverPasswordSelected()
         return;
 
     if (dlg.guidedRequested()) {
-        openAdvancedPlanner(item, mode, hashTypeName, hashFile, planDir);
+        openAdvancedPlanner(item, mode, hashTypeName, hashFile, planDir, extractionId);
         return;
     }
     if (!dlg.startRequested())
@@ -785,7 +789,7 @@ void ForensicWindow::recoverPasswordSelected()
         return;
 
     m_recovery->queueRecoveryJob(dlg.plannedSpec(), item.id, toolPath, toolVersion,
-                                 dlg.plannedEngineId(), dlg.chosenDictionary());
+                                 dlg.plannedEngineId(), dlg.chosenDictionary(), extractionId);
     m_tabs->setCurrentIndex(1); // show the Jobs tab
 }
 
@@ -829,7 +833,7 @@ void ForensicWindow::planAttackSelected()
     const QString planDir = QDir(m_workspace->jobsDir())
                                 .filePath(QStringLiteral("plan-") + QUuid::createUuid().toString(QUuid::WithoutBraces));
 
-    openAdvancedPlanner(item, chosen.selectedMode, hashTypeName, hashFile, planDir);
+    openAdvancedPlanner(item, chosen.selectedMode, hashTypeName, hashFile, planDir, chosen.id);
 }
 
 void ForensicWindow::zipCryptoAttackSelected()

@@ -99,6 +99,9 @@ QJsonObject CrackingJob::toJson() const
     obj[QStringLiteral("id")] = id.toString(QUuid::WithoutBraces);
     obj[QStringLiteral("caseId")] = caseId;
     obj[QStringLiteral("evidenceId")] = evidenceId.toString(QUuid::WithoutBraces);
+    // Only written when bound, so legacy records stay byte-identical shape.
+    if (!extractionId.isNull())
+        obj[QStringLiteral("extractionId")] = extractionId.toString(QUuid::WithoutBraces);
     obj[QStringLiteral("hashMode")] = static_cast<double>(hashMode);
     obj[QStringLiteral("attackMode")] = attackMode;
     obj[QStringLiteral("engineId")] = engineId;
@@ -129,6 +132,8 @@ CrackingJob CrackingJob::fromJson(const QJsonObject &obj)
     j.id = QUuid::fromString(obj.value(QStringLiteral("id")).toString());
     j.caseId = obj.value(QStringLiteral("caseId")).toString();
     j.evidenceId = QUuid::fromString(obj.value(QStringLiteral("evidenceId")).toString());
+    // Absent on legacy records -> null; ReportBuilder then uses its fallback.
+    j.extractionId = QUuid::fromString(obj.value(QStringLiteral("extractionId")).toString());
     j.hashMode = static_cast<quint32>(obj.value(QStringLiteral("hashMode")).toDouble());
     j.attackMode = obj.value(QStringLiteral("attackMode")).toInt();
     // Records written before engines were pluggable are hashcat jobs.

@@ -64,6 +64,7 @@ QString ReportRenderer::toHtml(const RecoveryReport &report)
     h += QStringLiteral("</table>");
 
     h += QStringLiteral("<h2>Extraction</h2><table>");
+    h += row(QStringLiteral("Extraction ID"), report.extractionId);
     h += row(QStringLiteral("Extractor"), report.extractorId);
     h += row(QStringLiteral("Extractor version"), report.extractorVersion);
     h += row(QStringLiteral("Extraction result"), report.extractionStatus);
