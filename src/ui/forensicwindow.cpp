@@ -277,6 +277,7 @@ ForensicWindow::ForensicWindow(QWidget *parent)
     connect(m_queue, &JobQueue::credentialRecovered, this, &ForensicWindow::onCredentialRecovered);
 
     setCaseActionsEnabled(false);
+    updateJobsEmptyHint(); // no jobs yet -> show the hint, hide the table
     updateWelcomeVisibility(); // start on the welcome screen
 }
 
@@ -343,18 +344,38 @@ QWidget *ForensicWindow::buildJobsTab()
     connect(report, &QPushButton::clicked, this, &ForensicWindow::generateReportForSelectedJob);
     buttonRow->addWidget(report);
     buttonRow->addStretch();
+    // Progressive disclosure: the technical columns (hash mode, device, speed,
+    // candidates, keyspace, runtime, ETA) are hidden by default so the Jobs view
+    // reads as Artifact / Strategy / Progress / Status / Result.
+    auto *details = new QCheckBox(tr("Show details"), w);
+    buttonRow->addWidget(details);
     layout->addLayout(buttonRow);
+
+    m_jobsEmptyHint = new QLabel(
+        tr("No recovery jobs yet.\nSelect an artifact and use “Recover Password…” to start one."), w);
+    m_jobsEmptyHint->setAlignment(Qt::AlignCenter);
+    m_jobsEmptyHint->setStyleSheet(QStringLiteral("color:#666;padding:24px;"));
+    layout->addWidget(m_jobsEmptyHint);
 
     m_jobsTable = new QTableWidget(0, 12, w);
     m_jobsTable->setHorizontalHeaderLabels(
-        {tr("Artifact"), tr("Hash mode"), tr("Attack"), tr("Device"), tr("Progress %"),
+        {tr("Artifact"), tr("Hash mode"), tr("Strategy"), tr("Device"), tr("Progress %"),
          tr("Speed (H/s)"), tr("Candidates"), tr("Keyspace"), tr("Runtime"), tr("ETA"),
-         tr("Status"), tr("Recovered")});
+         tr("Status"), tr("Result")});
     m_jobsTable->horizontalHeader()->setStretchLastSection(true);
     m_jobsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_jobsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_jobsTable->setSelectionMode(QAbstractItemView::SingleSelection);
     layout->addWidget(m_jobsTable);
+
+    // The columns hidden unless "Show details" is checked.
+    const QList<int> technicalCols = {1, 3, 5, 6, 7, 8, 9};
+    auto applyDetail = [this, technicalCols](bool on) {
+        for (int c : technicalCols)
+            m_jobsTable->setColumnHidden(c, !on);
+    };
+    applyDetail(false);
+    connect(details, &QCheckBox::toggled, this, applyDetail);
     return w;
 }
 
@@ -452,6 +473,9 @@ void ForensicWindow::newCase()
     setCaseActionsEnabled(true);
     refreshCaseHeader();
     reloadEvidenceTable();
+    m_jobsTable->setRowCount(0); // a fresh case has no jobs yet
+    refreshResults();
+    updateJobsEmptyHint();
     updateWelcomeVisibility(); // reveal the case view
 }
 
@@ -476,6 +500,7 @@ void ForensicWindow::openCase()
     // reopen; each restore emits jobChanged, which populates the jobs table.
     m_recovery->restoreJobs();
     refreshResults();
+    updateJobsEmptyHint();
 }
 
 void ForensicWindow::addArtifact()
@@ -1009,8 +1034,23 @@ void ForensicWindow::upsertJobRow(const CrackingJob &job)
     }
     m_jobsTable->item(row, 0)->setText(artifactName(job.evidenceId));
     m_jobsTable->item(row, 1)->setText(QStringLiteral("-m %1").arg(job.hashMode));
-    m_jobsTable->item(row, 2)->setText(forensic::attackModeName(job.attackMode));
+    // A friendly strategy label: name the dictionary when one was used, else the
+    // attack-mode name.
+    m_jobsTable->item(row, 2)->setText(
+        job.dictionary.isSet()
+            ? tr("Dictionary: %1").arg(job.dictionary.displayName)
+            : forensic::attackModeName(job.attackMode));
     m_jobsTable->item(row, 10)->setText(forensic::jobStateToString(job.state));
+    updateJobsEmptyHint();
+}
+
+void ForensicWindow::updateJobsEmptyHint()
+{
+    if (!m_jobsEmptyHint || !m_jobsTable)
+        return;
+    const bool empty = m_jobsTable->rowCount() == 0;
+    m_jobsEmptyHint->setVisible(empty);
+    m_jobsTable->setVisible(!empty);
 }
 
 void ForensicWindow::onJobChanged(const CrackingJob &job)

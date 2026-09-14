@@ -121,6 +121,8 @@ private:
     QTableWidget *m_table = nullptr;
 
     QTabWidget *m_tabs = nullptr;
+    QLabel *m_jobsEmptyHint = nullptr;
+    void updateJobsEmptyHint();
     QTableWidget *m_jobsTable = nullptr;
     QTableWidget *m_resultsTable = nullptr;
     QPushButton *m_copyValueButton = nullptr;
