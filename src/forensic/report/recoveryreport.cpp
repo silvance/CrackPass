@@ -38,10 +38,14 @@ QJsonObject RecoveryReport::toJson() const
     attack[QStringLiteral("wordlists")] = arr(wordlists);
     attack[QStringLiteral("rules")] = arr(rules);
     attack[QStringLiteral("mask")] = mask;
-    attack[QStringLiteral("hashcatArgs")] = arr(hashcatArgs);
+    attack[QStringLiteral("engineArgs")] = arr(engineArgs);
 
     QJsonObject env;
-    env[QStringLiteral("hashcatVersion")] = hashcatVersion;
+    env[QStringLiteral("engineId")] = engineId;
+    env[QStringLiteral("engineDisplayName")] = engineDisplayName;
+    env[QStringLiteral("engineVersion")] = engineVersion;
+    env[QStringLiteral("enginePath")] = enginePath;
+    env[QStringLiteral("engineExeSha256")] = engineExeSha256;
     env[QStringLiteral("devices")] = arr(devices);
 
     QJsonObject outcome;
@@ -53,9 +57,10 @@ QJsonObject RecoveryReport::toJson() const
     QJsonObject credential;
     credential[QStringLiteral("recovered")] = recovered;
     if (recovered) {
-        credential[QStringLiteral("plaintext")] = recoveredPlaintext;
+        credential[QStringLiteral("kind")] = recoveredKind;
+        credential[QStringLiteral("value")] = recoveredPlaintext;
         credential[QStringLiteral("encoding")] = recoveredEncoding;
-        credential[QStringLiteral("hash")] = recoveredHash;
+        credential[QStringLiteral("target")] = recoveredHash;
         credential[QStringLiteral("recoveredUtc")] = recoveredUtc;
     }
 
@@ -67,7 +72,7 @@ QJsonObject RecoveryReport::toJson() const
     root[QStringLiteral("examiner")] = examiner;
     root[QStringLiteral("artifact")] = artifact;
     root[QStringLiteral("extraction")] = extraction;
-    root[QStringLiteral("hashcat")] = env;
+    root[QStringLiteral("engine")] = env;
     root[QStringLiteral("attack")] = attack;
     root[QStringLiteral("outcome")] = outcome;
     root[QStringLiteral("credential")] = credential;

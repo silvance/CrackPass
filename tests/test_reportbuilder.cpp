@@ -97,11 +97,13 @@ void TestReportBuilder::buildsFullReportWithRecovery()
     QCOMPARE(r.hashModeName, QStringLiteral("PDF 1.4-1.6 (Acrobat 5-8)"));
     QCOMPARE(r.attackStrategy, QStringLiteral("Straight (dictionary)"));
     QCOMPARE(r.wordlists, QStringList{"rockyou.txt"});
-    QCOMPARE(r.hashcatVersion, QStringLiteral("v7.1.2"));
+    QCOMPARE(r.engineVersion, QStringLiteral("v7.1.2"));
+    QCOMPARE(r.engineArgs, (QStringList{"-m", "10500", "-a", "0", "hash.txt", "rockyou.txt", "-r", "best64.rule"}));
     QVERIFY(r.runtimeMs >= 42000);
     QCOMPARE(r.finalStatus, QStringLiteral("recovered"));
     QVERIFY(r.recovered);
     QCOMPARE(r.recoveredPlaintext, QStringLiteral("letmein"));
+    QCOMPARE(r.recoveredKind, QStringLiteral("password")); // a password, labelled as such
 }
 
 void TestReportBuilder::jsonAndHtmlContainKeyFields()
@@ -116,13 +118,16 @@ void TestReportBuilder::jsonAndHtmlContainKeyFields()
     const QJsonObject o = QJsonDocument::fromJson(json).object();
     QVERIFY(o.contains("artifact"));
     QCOMPARE(o.value("artifact").toObject().value("sha256").toString(), r.artifactSha256);
-    QCOMPARE(o.value("credential").toObject().value("plaintext").toString(), QStringLiteral("letmein"));
+    const QJsonObject cred = o.value("credential").toObject();
+    QCOMPARE(cred.value("value").toString(), QStringLiteral("letmein"));
+    QCOMPARE(cred.value("kind").toString(), QStringLiteral("password"));
 
     const QString html = ReportRenderer::toHtml(r);
-    QVERIFY(html.contains("Password Recovery Report"));
+    QVERIFY(html.contains("Recovery Report"));
     QVERIFY(html.contains(r.artifactSha256));
     QVERIFY(html.contains("letmein"));
     QVERIFY(html.contains("-m 10500"));
+    QVERIFY(html.contains("Recovery engine")); // engine-neutral section, not "Hashcat environment"
 }
 
 
