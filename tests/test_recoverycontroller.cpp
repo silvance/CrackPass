@@ -39,6 +39,16 @@ public:
     bool resumeRestore = false;
 };
 
+// A controller whose initial job persistence always fails, to prove that a
+// persistence failure prevents the engine from ever starting.
+class FailingPersistController : public RecoveryController
+{
+public:
+    using RecoveryController::RecoveryController;
+protected:
+    bool persistNewJob(const CrackingJob &) override { return false; }
+};
+
 class TestRecoveryController : public QObject
 {
     Q_OBJECT
@@ -48,6 +58,7 @@ private slots:
     void noWorkspaceIsANoOp();
     void restoreJobsRehydratesPersistedJobsForResume();
     void refusesUnknownEngine();
+    void persistenceFailurePreventsStart();
     void queuesBkcrackJob();
     void refusesIncompleteBkcrackJob();
     void queuesJohnWordlistJob();
@@ -190,6 +201,28 @@ void TestRecoveryController::refusesUnknownEngine()
     QCOMPARE(refused.size(), 1);
     QVERIFY(backend.started.isEmpty());
     QVERIFY(ws->jobs().isEmpty());
+}
+
+void TestRecoveryController::persistenceFailurePreventsStart()
+{
+    QTemporaryDir dir;
+    auto ws = CaseWorkspace::create(dir.path(), CaseInfo{});
+    QVERIFY(ws);
+
+    FakeBackend backend;
+    JobQueue queue(&backend);
+    FailingPersistController controller(&queue); // persistNewJob() always fails
+    controller.setWorkspace(ws.get());
+
+    QSignalSpy refused(&controller, &RecoveryController::recoveryRefused);
+    const QUuid jobId = controller.queueRecoveryJob(straightSpec(), QUuid::createUuid(),
+                                                    QStringLiteral("/tools/hashcat"));
+    // A job that could not be persisted must not start, must not linger in the
+    // queue, and the examiner must be told.
+    QVERIFY(jobId.isNull());
+    QCOMPARE(refused.size(), 1);
+    QVERIFY(backend.started.isEmpty());
+    QVERIFY(queue.jobs().isEmpty());
 }
 
 void TestRecoveryController::queuesBkcrackJob()

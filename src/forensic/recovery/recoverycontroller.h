@@ -78,12 +78,26 @@ public:
     static JobQueue::JobPaths buildPaths(const QString &jobDir, const QUuid &jobId);
 
 signals:
-    // Emitted when queueRecoveryJob declines to queue an attack, with a
-    // human-readable reason (unknown engine, or an engine that cannot express
-    // the planned attack). The UI shows this to the examiner.
+    // Emitted when a queue request is declined (no case, unknown engine, an
+    // engine that cannot express the attack, or the initial persistence failed
+    // so nothing was started). The UI shows the reason to the examiner.
     void recoveryRefused(const QString &reason);
 
+    // Emitted when persisting a RUNNING job's state transition failed. The job
+    // keeps running (the queue is not corrupted); the examiner is warned that
+    // the on-disk record may be stale.
+    void jobPersistenceFailed(const forensic::CrackingJob &job, const QString &error);
+
+protected:
+    // Persist a freshly built job (atomic write + job_created audit) before it is
+    // enqueued. Virtual so tests can inject a persistence failure.
+    virtual bool persistNewJob(const CrackingJob &job);
+
 private:
+    // Persist the job, then enqueue it (which starts it); refuse if persistence
+    // fails. Shared by queueRecoveryJob and queueBkcrackJob.
+    QUuid persistThenEnqueue(const CrackingJob &job);
+
     JobQueue *m_queue;
     CaseWorkspace *m_workspace = nullptr;
     RecoveryEngineRegistry m_engines = RecoveryEngineRegistry::withBuiltins();

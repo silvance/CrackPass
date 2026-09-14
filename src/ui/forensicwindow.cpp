@@ -202,6 +202,14 @@ ForensicWindow::ForensicWindow(QWidget *parent)
             [this](const QString &reason) {
                 QMessageBox::warning(this, tr("Queue Attack"), reason);
             });
+    // A running job whose state could not be re-saved keeps running, but warn
+    // the examiner that the on-disk record for it may be stale.
+    connect(m_recovery, &forensic::RecoveryController::jobPersistenceFailed, this,
+            [this](const forensic::CrackingJob &, const QString &error) {
+                QMessageBox::warning(this, tr("Case persistence"),
+                                     tr("A running job's state could not be saved to the case: %1")
+                                         .arg(error));
+            });
     connect(m_queue, &JobQueue::jobChanged, this, &ForensicWindow::onJobChanged);
     connect(m_queue, &JobQueue::jobStatus, this, &ForensicWindow::onJobStatus);
     connect(m_queue, &JobQueue::credentialRecovered, this, &ForensicWindow::onCredentialRecovered);
