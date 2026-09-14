@@ -17,10 +17,23 @@ Nothing here requires network access or a commercial license to run.
 
 | Component | Purpose | License | Notes |
 | --- | --- | --- | --- |
-| **hashcat** | Primary cracking engine | MIT | Path configured by the examiner (or portable/PATH); invoked with `--status-json`. Not redistributed by CaseKey by default. |
-| **John the Ripper Jumbo** (`john`) | Second cracking engine | GPL-2.0-or-later (with OpenSSL/other permissive parts) | Supplied on the workstation; the resolved binary + version is recorded on each job. |
-| **John the Ripper Jumbo** — `office2john`, `pdf2john`, `zip2john`, `rar2john`, `7z2john`, `keepass2john`, `bitlocker2john` | Hash extraction from encrypted files/containers | GPL-2.0-or-later (with OpenSSL/other permissive parts) | Supplied on the workstation; each extraction records the exact tool + version used. |
-| **bkcrack** | ZipCrypto known-plaintext cryptanalysis (legacy ZIP only) | zlib | Supplied on the workstation; used only for traditional PKWARE ZipCrypto, never AES ZIPs. |
+| **hashcat** | Primary cracking engine | MIT | Invoked with `--status-json`. Supplied by the examiner in the lean build; **bundled** in the full release bundle. |
+| **John the Ripper Jumbo** (`john`) | Second cracking engine | GPL-2.0-or-later (with OpenSSL/other permissive parts) | The resolved binary + version is recorded on each job. Supplied by the examiner in the lean build; **bundled** in the full release bundle. |
+| **John the Ripper Jumbo** — `office2john`, `pdf2john`, `zip2john`, `rar2john`, `7z2john`, `keepass2john`, `bitlocker2john` | Hash extraction from encrypted files/containers | GPL-2.0-or-later (with OpenSSL/other permissive parts) | Each extraction records the exact tool + version used. Bundled with `john` in the full bundle (the Python scripts run against the bundled embeddable Python). |
+| **bkcrack** | ZipCrypto known-plaintext cryptanalysis (legacy ZIP only) | zlib | Used only for traditional PKWARE ZipCrypto, never AES ZIPs. Supplied by the examiner in the lean build; **bundled** in the full release bundle. |
+| **Python (embeddable)** | Interpreter for the John `*2john` extraction scripts | PSF-2.0 | Bundled in the full release bundle only, under `runtime/python/`; not linked into CaseKey. |
+
+### Bundled versions and provenance (full release bundle)
+
+The full bundle (`release-bundle.yml`) redistributes the tools above. The exact
+pinned versions and download URLs are in `tools/engines.lock.json`; each is
+verified by SHA-256 at build time (fail-closed) and the digest is recorded in the
+bundle's `LICENSES/BUNDLED-ENGINES.json`. Each tool's own license text is
+collected into the bundle's `LICENSES/` directory, and `SOURCE_OFFER.md` provides
+the written offer of corresponding source for the GPL component (John the
+Ripper), pointing at the exact upstream source tag. Bumping a bundled version
+means updating `engines.lock.json` (URL + version + re-locked SHA-256) and this
+table.
 
 ## Wordlists / dictionaries
 
@@ -59,9 +72,15 @@ records; that provenance travels with the job and report.
   licenses (MIT, GPL-2.0) apply to those tools independently and do not impose
   additional obligations on CaseKey's own GPL-3.0 code beyond shipping their
   licenses if you choose to bundle the binaries.
-- If you **bundle** hashcat, JtR, rule files or wordlists into a distribution,
-  include each project's own `LICENSE`/`COPYING` in `tools/<component>/` and list
-  the exact versions here.
+- The **full release bundle** does bundle these engines. That is handled
+  automatically: `tools/fetch_engines.py` collects each tool's own
+  `LICENSE`/`COPYING` into the bundle's `LICENSES/` directory and writes
+  `SOURCE_OFFER.md` (the GPL written offer, with the exact upstream source tag for
+  John the Ripper). Because the engines are separate processes over a command-line
+  boundary — not linked into CaseKey — their licenses (MIT, GPL-2.0-or-later,
+  zlib, PSF) apply to those tools independently and impose no additional
+  obligation on CaseKey's own GPL-3.0 code beyond shipping those licenses and,
+  for the GPL tool, the source offer.
 
 ## How versions are captured at runtime
 

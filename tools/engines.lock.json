@@ -1,0 +1,67 @@
+{
+  "comment": [
+    "Pinned upstream sources for the FULL Windows release bundle (tools/fetch_engines.py).",
+    "INTEGRITY IS FAIL-CLOSED: 'sha256' MUST be a 64-hex digest. fetch_engines.py refuses to",
+    "bundle any engine whose sha256 is empty or does not match the download, so an unverified",
+    "third-party binary is never shipped in a forensic tool. To populate the digests the first",
+    "time (or after bumping a version/url), run on a networked machine:",
+    "    python tools/fetch_engines.py --print-hashes",
+    "and commit the printed values here. A release maintainer MUST also confirm each 'url' and",
+    "'version' points at the intended official artifact before the first release.",
+    "Layout targets match CaseKey's portable discovery (see DependencyProbe::resolveTool):",
+    "hashcat -> tools/hashcat/, john (+*2john) -> tools/john/run/, bkcrack -> tools/bkcrack/,",
+    "rules -> tools/rules/, python (for *2john scripts) -> runtime/python/."
+  ],
+  "engines": [
+    {
+      "id": "hashcat",
+      "version": "6.2.6",
+      "url": "https://hashcat.net/files/hashcat-6.2.6.7z",
+      "sha256": "",
+      "archive": "7z",
+      "strip_top_dir": true,
+      "dest": "tools/hashcat",
+      "also_copy": [ { "from": "rules", "to": "tools/rules" } ],
+      "license_globs": [ "docs/license.txt", "*.txt" ],
+      "license": "MIT",
+      "source": "https://github.com/hashcat/hashcat/tree/v6.2.6"
+    },
+    {
+      "id": "john",
+      "version": "1.9.0-jumbo-1",
+      "url": "https://www.openwall.com/john/k/john-1.9.0-jumbo-1-win64.7z",
+      "sha256": "",
+      "archive": "7z",
+      "strip_top_dir": true,
+      "dest": "tools/john",
+      "license_globs": [ "doc/LICENSE*", "doc/COPYING*", "run/LICENSE*" ],
+      "license": "GPL-2.0-or-later",
+      "source": "https://github.com/openwall/john/tree/1.9.0-jumbo-1"
+    },
+    {
+      "id": "bkcrack",
+      "version": "1.7.1",
+      "url": "https://github.com/kimci86/bkcrack/releases/download/v1.7.1/bkcrack-1.7.1-windows.zip",
+      "sha256": "",
+      "archive": "zip",
+      "strip_top_dir": true,
+      "dest": "tools/bkcrack",
+      "license_globs": [ "LICENSE*", "license*" ],
+      "license": "zlib",
+      "source": "https://github.com/kimci86/bkcrack/tree/v1.7.1"
+    },
+    {
+      "id": "python",
+      "version": "3.12.7",
+      "url": "https://www.python.org/ftp/python/3.12.7/python-3.12.7-embed-amd64.zip",
+      "sha256": "",
+      "archive": "zip",
+      "strip_top_dir": false,
+      "dest": "runtime/python",
+      "license_globs": [ "LICENSE*" ],
+      "license": "PSF-2.0",
+      "source": "https://www.python.org/downloads/release/python-3127/",
+      "notes": "Embeddable interpreter so the John *2john Python scripts (e.g. office2john) run with no separate install; CaseKey.cmd puts it on PATH."
+    }
+  ]
+}
