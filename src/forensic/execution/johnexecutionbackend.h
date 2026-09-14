@@ -52,9 +52,9 @@ public:
     // may still be $HEX[..]-wrapped (decode with decodeHashcatPlain).
     static QString potPlaintextToken(const QString &potLine, const QString &knownHash);
 
-    // Exposed for testing: parse one john status line into a HashcatStatus
+    // Exposed for testing: parse one john status line into a RecoveryStatus
     // (speed + guesses). Returns false when the line is not a status line.
-    static bool parseProgressLine(const QString &line, class HashcatStatus &out);
+    static bool parseProgressLine(const QString &line, class RecoveryStatus &out);
 
 private:
     enum class Pending { None, Pause, Stop };

@@ -727,7 +727,7 @@ void ForensicWindow::onJobChanged(const CrackingJob &job)
     upsertJobRow(job);
 }
 
-void ForensicWindow::onJobStatus(const QUuid &jobId, const forensic::HashcatStatus &status)
+void ForensicWindow::onJobStatus(const QUuid &jobId, const forensic::RecoveryStatus &status)
 {
     const int row = jobRow(jobId);
     if (row < 0)

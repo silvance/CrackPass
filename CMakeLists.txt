@@ -75,6 +75,7 @@ add_library(forensic_core STATIC
     src/forensic/bkcrack/bkcrackattackspec.h
     src/forensic/bkcrack/bkcrackcommandbuilder.h
     src/forensic/bkcrack/bkcrackcommandbuilder.cpp
+    src/forensic/execution/recoverystatus.h
     src/forensic/execution/hashcatstatus.h
     src/forensic/execution/hashcatstatusparser.h
     src/forensic/execution/hashcatstatusparser.cpp

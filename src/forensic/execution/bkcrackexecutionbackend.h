@@ -49,8 +49,8 @@ public:
     static QString parseKeysLine(const QString &line);
 
     // Exposed for testing: parse a bkcrack progress line ("50.0 % (a / b)") into
-    // a HashcatStatus. Returns false when the line is not a progress line.
-    static bool parseProgressLine(const QString &line, class HashcatStatus &out);
+    // a RecoveryStatus. Returns false when the line is not a progress line.
+    static bool parseProgressLine(const QString &line, class RecoveryStatus &out);
 
     // Exposed for testing: a human-readable target label ("<archive>!<entry>")
     // derived from the bkcrack argv (-C / -c), for the recovered record.

@@ -46,7 +46,7 @@ void TestStatusStream::splitAtEveryByte()
         const auto b = s.append(full.mid(split));
         const int total = a.size() + b.size();
         QCOMPARE(total, 1);
-        const HashcatStatus st = a.isEmpty() ? b.first() : a.first();
+        const RecoveryStatus st = a.isEmpty() ? b.first() : a.first();
         QCOMPARE(st.progressDone, qint64(123));
         QCOMPARE(st.progressTotal, qint64(456));
         // Nothing should surface before the newline is delivered.
@@ -60,8 +60,8 @@ void TestStatusStream::multipleRecordsInOneChunk()
     HashcatStatusStream s;
     const auto out = s.append(rec(3, 1, 10) + rec(5, 10, 10));
     QCOMPARE(out.size(), 2);
-    QCOMPARE(out.at(0).statusCode, 3);
-    QCOMPARE(out.at(1).statusCode, 5);
+    QCOMPARE(out.at(0).nativeStatusCode, 3);
+    QCOMPARE(out.at(1).nativeStatusCode, 5);
 }
 
 void TestStatusStream::partialWithoutNewlineYieldsNothing()

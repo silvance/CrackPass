@@ -87,7 +87,7 @@ qint64 parseScaledRate(const QString &numberWithSuffix)
 
 } // namespace
 
-bool JohnExecutionBackend::parseProgressLine(const QString &line, HashcatStatus &out)
+bool JohnExecutionBackend::parseProgressLine(const QString &line, RecoveryStatus &out)
 {
     // A john status line looks like:
     //   0g 0:00:00:05 12.34% (ETA: ...) 4567p/s 4567c/s 4567C/s foo..bar
@@ -98,8 +98,8 @@ bool JohnExecutionBackend::parseProgressLine(const QString &line, HashcatStatus 
         return false;
 
     bool recognized = false;
-    HashcatStatus st;
-    st.statusCode = HashcatStatusCode::Running;
+    RecoveryStatus st;
+    st.state = RecoveryState::Running; // engine-neutral; John has no hashcat status code
 
     // Guesses so far: a leading "<N>g" token.
     QRegularExpression guessRe(QStringLiteral("(?:^|\\s)(\\d+)g(?:\\s|$)"));
@@ -219,7 +219,7 @@ void JohnExecutionBackend::drainStderr(const QUuid &jobId)
     while ((nl = ctx->stderrBuf.indexOf('\n')) >= 0) {
         const QString line = QString::fromUtf8(ctx->stderrBuf.left(nl));
         ctx->stderrBuf.remove(0, nl + 1);
-        HashcatStatus st;
+        RecoveryStatus st;
         if (parseProgressLine(line, st))
             emit statusUpdated(jobId, st);
     }

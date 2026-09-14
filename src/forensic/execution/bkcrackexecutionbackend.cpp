@@ -45,16 +45,16 @@ QString BkcrackExecutionBackend::parseKeysLine(const QString &line)
         .toLower();
 }
 
-bool BkcrackExecutionBackend::parseProgressLine(const QString &line, HashcatStatus &out)
+bool BkcrackExecutionBackend::parseProgressLine(const QString &line, RecoveryStatus &out)
 {
     // e.g. "50.0 % (8388608 / 16777216)".
     static const QRegularExpression re(QStringLiteral("\\((\\d+)\\s*/\\s*(\\d+)\\)"));
     const QRegularExpressionMatch m = re.match(line);
     if (!m.hasMatch() || !line.contains(QLatin1Char('%')))
         return false;
-    HashcatStatus st;
+    RecoveryStatus st;
     st.valid = true;
-    st.statusCode = HashcatStatusCode::Running;
+    st.state = RecoveryState::Running; // engine-neutral; bkcrack has no hashcat status code
     st.progressDone = m.captured(1).toLongLong();
     st.progressTotal = m.captured(2).toLongLong();
     out = st;
@@ -105,19 +105,19 @@ void BkcrackExecutionBackend::launch(const QUuid &jobId)
                     return;
                 drainOutput(jobId); // capture any final keys line
                 const Pending pending = c->pending;
-                const bool keys = c->keysEmitted;
                 c->proc->deleteLater();
                 c->proc = nullptr;
                 if (pending == Pending::Pause) {
                     emit paused(jobId);
                 } else if (pending == Pending::Stop) {
                     emit stopped(jobId);
-                } else if (keys) {
-                    // Keys recovered: report Cracked so the queue records Recovered.
-                    emit finished(jobId, exitCode, HashcatStatusCode::Cracked);
                 } else {
-                    // No keys: bkcrack exits non-zero; present as Exhausted.
-                    emit finished(jobId, exitCode, HashcatStatusCode::Exhausted);
+                    // bkcrack has no hashcat-style status code, so pass none (-1).
+                    // When keys were recovered the cracked() signal has already
+                    // set the queue's recovered flag, so the queue records
+                    // Recovered; otherwise it uses the exit code (non-zero =>
+                    // Exhausted).
+                    emit finished(jobId, exitCode, -1);
                 }
             });
     connect(proc, &QProcess::errorOccurred, this, [this, jobId](QProcess::ProcessError e) {
@@ -149,7 +149,7 @@ void BkcrackExecutionBackend::drainOutput(const QUuid &jobId)
         const QString line = QString::fromUtf8(ctx->outBuf.left(nl));
         ctx->outBuf.remove(0, nl + 1);
 
-        HashcatStatus st;
+        RecoveryStatus st;
         if (parseProgressLine(line, st)) {
             emit statusUpdated(jobId, st);
             continue;

@@ -28,7 +28,7 @@ public:
     void stop(const QUuid &id) override { stoppedCalls << id; }
 
     void fireRunning(const QUuid &id) { emit running(id); }
-    void fireStatus(const QUuid &id, const HashcatStatus &s) { emit statusUpdated(id, s); }
+    void fireStatus(const QUuid &id, const RecoveryStatus &s) { emit statusUpdated(id, s); }
     void fireCracked(const QUuid &id, const QString &h, const QByteArray &p) { emit cracked(id, h, p); }
     void firePaused(const QUuid &id) { emit paused(id); }
     void fireStopped(const QUuid &id) { emit stopped(id); }
@@ -72,9 +72,9 @@ void TestJobQueue::statusMovesToRunning()
     QCOMPARE(backend.started.size(), 1);
     QCOMPARE(q.jobById(id).state, JobState::Preparing);
 
-    HashcatStatus s;
+    RecoveryStatus s;
     s.valid = true;
-    s.statusCode = HashcatStatusCode::Running;
+    s.nativeStatusCode = HashcatStatusCode::Running;
     s.progressDone = 1;
     s.progressTotal = 10;
     backend.fireStatus(id, s);

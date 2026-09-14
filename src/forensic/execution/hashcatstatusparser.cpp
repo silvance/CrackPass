@@ -10,9 +10,9 @@
 
 namespace forensic {
 
-HashcatStatus HashcatStatusParser::parse(const QByteArray &jsonObject)
+RecoveryStatus HashcatStatusParser::parse(const QByteArray &jsonObject)
 {
-    HashcatStatus s;
+    RecoveryStatus s;
     QJsonParseError err;
     const QJsonDocument doc = QJsonDocument::fromJson(jsonObject, &err);
     if (err.error != QJsonParseError::NoError || !doc.isObject())
@@ -23,7 +23,8 @@ HashcatStatus HashcatStatusParser::parse(const QByteArray &jsonObject)
     if (!o.contains(QStringLiteral("status")) || !o.contains(QStringLiteral("progress")))
         return s;
 
-    s.statusCode = o.value(QStringLiteral("status")).toInt();
+    s.nativeStatusCode = o.value(QStringLiteral("status")).toInt();
+    s.state = recoveryStateFromHashcatCode(s.nativeStatusCode);
     s.target = o.value(QStringLiteral("target")).toString();
 
     const QJsonArray progress = o.value(QStringLiteral("progress")).toArray();
@@ -44,7 +45,7 @@ HashcatStatus HashcatStatusParser::parse(const QByteArray &jsonObject)
     const QJsonArray devices = o.value(QStringLiteral("devices")).toArray();
     for (const QJsonValue &dv : devices) {
         const QJsonObject d = dv.toObject();
-        HashcatDeviceStatus dev;
+        RecoveryDeviceStatus dev;
         dev.id = d.value(QStringLiteral("device_id")).toInt();
         dev.name = d.value(QStringLiteral("device_name")).toString();
         dev.speed = static_cast<qint64>(d.value(QStringLiteral("speed")).toDouble());
@@ -56,15 +57,15 @@ HashcatStatus HashcatStatusParser::parse(const QByteArray &jsonObject)
     return s;
 }
 
-HashcatStatus HashcatStatusParser::parseLatest(const QByteArray &stdoutChunk)
+RecoveryStatus HashcatStatusParser::parseLatest(const QByteArray &stdoutChunk)
 {
-    HashcatStatus latest;
+    RecoveryStatus latest;
     const QList<QByteArray> lines = stdoutChunk.split('\n');
     for (const QByteArray &line : lines) {
         const QByteArray trimmed = line.trimmed();
         if (!trimmed.startsWith('{'))
             continue;
-        const HashcatStatus s = parse(trimmed);
+        const RecoveryStatus s = parse(trimmed);
         if (s.valid)
             latest = s;
     }
