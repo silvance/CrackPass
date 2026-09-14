@@ -56,12 +56,15 @@ RecoveryReport ReportBuilder::build(const CaseWorkspace &ws, const CrackingJob &
     r.wordlists = job.wordlists;
     r.rules = job.rules;
     r.mask = job.mask;
-    r.hashcatArgs = job.engineArgs;
+    r.engineArgs = job.engineArgs;
 
-    // Engine environment (R6 renames the report's own fields; here we read the
-    // engine-neutral job provenance into the existing report fields).
-    r.hashcatVersion = job.engineVersion.isEmpty() ? QStringLiteral("(not recorded)")
-                                                   : job.engineVersion;
+    // Recovery engine environment (engine-neutral: hashcat / John / bkcrack).
+    r.engineId = job.engineId;
+    r.engineDisplayName = job.engineDisplayName.isEmpty() ? job.engineId : job.engineDisplayName;
+    r.engineVersion = job.engineVersion.isEmpty() ? QStringLiteral("(not recorded)")
+                                                  : job.engineVersion;
+    r.enginePath = job.enginePath;
+    r.engineExeSha256 = job.engineExeSha256;
     for (const ComputeDevice &d : job.devices)
         r.devices << QStringLiteral("#%1 %2 (%3)").arg(d.id).arg(d.name, d.backend);
     if (r.devices.isEmpty())
@@ -77,6 +80,7 @@ RecoveryReport ReportBuilder::build(const CaseWorkspace &ws, const CrackingJob &
     for (const RecoveredCredential &c : ws.recoveredCredentials()) {
         if (c.jobId == job.id) {
             r.recovered = true;
+            r.recoveredKind = resultKindNoun(c.kind);
             r.recoveredPlaintext = includePlaintext ? c.plaintext : QStringLiteral("[REDACTED]");
             r.recoveredEncoding = c.encoding;
             r.recoveredHash = c.hash;

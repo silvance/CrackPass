@@ -42,8 +42,12 @@ struct RecoveryReport
     QString extractorVersion;
     QString extractionStatus;
 
-    // Hashcat environment
-    QString hashcatVersion;
+    // Recovery engine environment
+    QString engineId;          // "hashcat" / "john" / "bkcrack"
+    QString engineDisplayName; // human-readable engine name
+    QString engineVersion;     // version / banner of the engine
+    QString enginePath;        // resolved executable
+    QString engineExeSha256;   // SHA-256 of the executable, if known
     QStringList devices;
 
     // Attack
@@ -54,7 +58,7 @@ struct RecoveryReport
     QStringList wordlists;
     QStringList rules;
     QString mask;
-    QStringList hashcatArgs; // exact parameters
+    QStringList engineArgs; // exact parameters passed to the engine
 
     // Timing / outcome
     QString startedUtc;
@@ -62,11 +66,12 @@ struct RecoveryReport
     qint64  runtimeMs = 0;
     QString finalStatus;
 
-    // Recovered credential (if any)
+    // Recovered result (if any)
     bool recovered = false;
-    QString recoveredPlaintext;
-    QString recoveredEncoding; // "utf-8" or "raw" (raw => plaintext shown as $HEX[..])
-    QString recoveredHash;
+    QString recoveredKind;     // "password", "key material", ... (result kind noun)
+    QString recoveredPlaintext; // the recovered value (password or key material)
+    QString recoveredEncoding; // "utf-8" or "raw" (raw => value shown as $HEX[..])
+    QString recoveredHash;     // the target (hash line, or bkcrack target label)
     QString recoveredUtc;
 
     QJsonObject toJson() const;

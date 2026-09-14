@@ -44,7 +44,7 @@ QString ReportRenderer::toHtml(const RecoveryReport &report)
                         "th{background:#f5f5f5;width:16rem}.ok{color:#137333}.rec{background:#e6f4ea}"
                         "code{white-space:pre-wrap;word-break:break-all}</style></head><body>");
 
-    h += QStringLiteral("<h1>Password Recovery Report</h1>");
+    h += QStringLiteral("<h1>Recovery Report</h1>");
     h += QStringLiteral("<p>Generated %1 by CaseKey %2</p>").arg(esc(report.generatedUtc), esc(report.applicationVersion));
 
     h += QStringLiteral("<h2>Case</h2><table>");
@@ -70,17 +70,23 @@ QString ReportRenderer::toHtml(const RecoveryReport &report)
     h += QStringLiteral("</table>");
 
     h += QStringLiteral("<h2>Attack</h2><table>");
-    h += row(QStringLiteral("Hashcat mode"), QStringLiteral("-m %1 (%2)").arg(report.hashMode).arg(report.hashModeName));
+    h += row(QStringLiteral("Hash mode"), QStringLiteral("-m %1 (%2)").arg(report.hashMode).arg(report.hashModeName));
     h += row(QStringLiteral("Attack strategy"), QStringLiteral("-a %1 (%2)").arg(report.attackMode).arg(report.attackStrategy));
     h += row(QStringLiteral("Wordlists"), report.wordlists.join(QStringLiteral(", ")));
     h += row(QStringLiteral("Rules"), report.rules.join(QStringLiteral(", ")));
     h += row(QStringLiteral("Mask"), report.mask);
     h += QStringLiteral("<tr><th>Exact parameters</th><td><code>%1</code></td></tr>")
-             .arg(esc(report.hashcatArgs.join(QLatin1Char(' '))));
+             .arg(esc(report.engineArgs.join(QLatin1Char(' '))));
     h += QStringLiteral("</table>");
 
-    h += QStringLiteral("<h2>Hashcat environment</h2><table>");
-    h += row(QStringLiteral("Hashcat version"), report.hashcatVersion);
+    h += QStringLiteral("<h2>Recovery engine</h2><table>");
+    h += row(QStringLiteral("Engine"),
+             report.engineDisplayName.isEmpty() ? report.engineId : report.engineDisplayName);
+    h += row(QStringLiteral("Version"), report.engineVersion);
+    if (!report.enginePath.isEmpty())
+        h += row(QStringLiteral("Executable"), report.enginePath);
+    if (!report.engineExeSha256.isEmpty())
+        h += row(QStringLiteral("Executable SHA-256"), report.engineExeSha256);
     h += row(QStringLiteral("Compute devices"), report.devices.join(QStringLiteral("; ")));
     h += QStringLiteral("</table>");
 
@@ -91,17 +97,23 @@ QString ReportRenderer::toHtml(const RecoveryReport &report)
     h += row(QStringLiteral("Final status"), report.finalStatus);
     h += QStringLiteral("</table>");
 
-    h += QStringLiteral("<h2>Recovered credential</h2>");
+    h += QStringLiteral("<h2>Recovered result</h2>");
     if (report.recovered) {
+        // Label the value by its actual kind ("Password", "Key material", ...)
+        // so key material is never described as a recovered password.
+        QString valueLabel = report.recoveredKind.isEmpty()
+            ? QStringLiteral("Value")
+            : report.recoveredKind.left(1).toUpper() + report.recoveredKind.mid(1);
         h += QStringLiteral("<table class=\"rec\">");
-        h += row(QStringLiteral("Plaintext"), report.recoveredPlaintext);
+        h += row(QStringLiteral("Result type"), report.recoveredKind);
+        h += row(valueLabel, report.recoveredPlaintext);
         if (!report.recoveredEncoding.isEmpty())
             h += row(QStringLiteral("Encoding"), report.recoveredEncoding);
-        h += row(QStringLiteral("Hash"), report.recoveredHash);
+        h += row(QStringLiteral("Target"), report.recoveredHash);
         h += row(QStringLiteral("Recovered (UTC)"), report.recoveredUtc);
         h += QStringLiteral("</table>");
     } else {
-        h += QStringLiteral("<p>No credential recovered for this attempt.</p>");
+        h += QStringLiteral("<p>Nothing recovered for this attempt.</p>");
     }
 
     h += QStringLiteral("</body></html>");
