@@ -287,24 +287,30 @@ QWidget *ForensicWindow::buildResultsTab()
     layout->addWidget(new QLabel(tr("Recovered credentials in this case:"), w));
 
     auto *ctrlRow = new QHBoxLayout;
-    auto *reveal = new QCheckBox(tr("Reveal passwords"), w);
+    // Recovered values (passwords AND key material) are concealed by default;
+    // revealing is a deliberate examiner action.
+    auto *reveal = new QCheckBox(tr("Reveal values"), w);
     connect(reveal, &QCheckBox::toggled, this, &ForensicWindow::setRevealPasswords);
     ctrlRow->addWidget(reveal);
-    auto *copyPw = new QPushButton(tr("Copy Password"), w);
-    connect(copyPw, &QPushButton::clicked, this, &ForensicWindow::copySelectedPassword);
-    ctrlRow->addWidget(copyPw);
-    auto *copyHash = new QPushButton(tr("Copy Hash"), w);
-    connect(copyHash, &QPushButton::clicked, this, &ForensicWindow::copySelectedHash);
-    ctrlRow->addWidget(copyHash);
+    // The copy button's label follows the selected result's kind (Copy Password
+    // vs Copy Key), so key material is never presented as a password.
+    m_copyValueButton = new QPushButton(tr("Copy Value"), w);
+    connect(m_copyValueButton, &QPushButton::clicked, this, &ForensicWindow::copySelectedValue);
+    ctrlRow->addWidget(m_copyValueButton);
+    auto *copyTarget = new QPushButton(tr("Copy Target"), w);
+    connect(copyTarget, &QPushButton::clicked, this, &ForensicWindow::copySelectedTarget);
+    ctrlRow->addWidget(copyTarget);
     ctrlRow->addStretch();
     layout->addLayout(ctrlRow);
 
-    m_resultsTable = new QTableWidget(0, 5, w);
+    m_resultsTable = new QTableWidget(0, 6, w);
     m_resultsTable->setHorizontalHeaderLabels(
-        {tr("Artifact"), tr("Plaintext"), tr("Hash"), tr("Recovered (UTC)"), tr("Job")});
+        {tr("Artifact"), tr("Type"), tr("Value"), tr("Target"), tr("Recovered (UTC)"), tr("Job")});
     m_resultsTable->horizontalHeader()->setStretchLastSection(true);
     m_resultsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_resultsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    connect(m_resultsTable, &QTableWidget::itemSelectionChanged,
+            this, &ForensicWindow::updateResultCopyLabel);
     layout->addWidget(m_resultsTable);
     return w;
 }
@@ -644,7 +650,7 @@ void ForensicWindow::reloadEvidenceTable()
 
 void ForensicWindow::appendEvidenceRow(int row)
 {
-    const EvidenceItem &e = m_workspace->evidence().at(row);
+    const EvidenceItem e = m_workspace->evidence().at(row); // by value: evidence() returns a temporary
 
     QString extractorText = tr("No");
     if (m_workspace->extractors().hasExtractorFor(e.type))
@@ -753,8 +759,13 @@ void ForensicWindow::onCredentialRecovered(const forensic::RecoveredCredential &
     // The RecoveryController persists the credential (it is connected first, so
     // it has already been written to the case by the time we refresh below).
     const int row = jobRow(cred.jobId);
-    if (row >= 0)
-        m_jobsTable->item(row, 11)->setText(cred.plaintext);
+    if (row >= 0) {
+        // Conceal the recovered value here too (same policy as the Results tab):
+        // the real value rides in UserRole; the cell shows bullets until revealed.
+        QTableWidgetItem *item = m_jobsTable->item(row, 11);
+        item->setData(Qt::UserRole, cred.plaintext);
+        item->setText(m_revealPasswords ? cred.plaintext : QStringLiteral("••••••"));
+    }
     refreshResults();
     m_tabs->setCurrentIndex(2); // surface the recovery immediately
 }
@@ -769,17 +780,24 @@ void ForensicWindow::refreshResults()
         const auto &c = creds.at(i);
         m_resultsTable->insertRow(i);
         m_resultsTable->setItem(i, 0, new QTableWidgetItem(artifactName(c.evidenceId)));
-        // Plaintext is concealed by default; the actual value lives in UserRole
-        // so Reveal and Copy work without displaying it.
-        auto *pw = new QTableWidgetItem(m_revealPasswords ? c.plaintext : QStringLiteral("\u2022\u2022\u2022\u2022\u2022\u2022"));
-        pw->setData(Qt::UserRole, c.plaintext);
-        m_resultsTable->setItem(i, 1, pw);
-        auto *hash = new QTableWidgetItem(c.hash);
-        hash->setData(Qt::UserRole, c.hash);
-        m_resultsTable->setItem(i, 2, hash);
-        m_resultsTable->setItem(i, 3, new QTableWidgetItem(c.recoveredUtc.toString(Qt::ISODate)));
-        m_resultsTable->setItem(i, 4, new QTableWidgetItem(c.jobId.toString(QUuid::WithoutBraces).left(8)));
+        // Type: password vs key material, so a bkcrack key is never shown as a
+        // "plaintext" password.
+        m_resultsTable->setItem(i, 1, new QTableWidgetItem(forensic::resultKindNoun(c.kind)));
+        // The recovered value (password or key material) is concealed by default;
+        // the actual value lives in UserRole so Reveal and Copy work without
+        // displaying it. The kind rides along so the copy button can label itself.
+        auto *val = new QTableWidgetItem(m_revealPasswords ? c.plaintext
+                                                           : QStringLiteral("\u2022\u2022\u2022\u2022\u2022\u2022"));
+        val->setData(Qt::UserRole, c.plaintext);
+        val->setData(Qt::UserRole + 1, static_cast<int>(c.kind));
+        m_resultsTable->setItem(i, 2, val);
+        auto *target = new QTableWidgetItem(c.hash);
+        target->setData(Qt::UserRole, c.hash);
+        m_resultsTable->setItem(i, 3, target);
+        m_resultsTable->setItem(i, 4, new QTableWidgetItem(c.recoveredUtc.toString(Qt::ISODate)));
+        m_resultsTable->setItem(i, 5, new QTableWidgetItem(c.jobId.toString(QUuid::WithoutBraces).left(8)));
     }
+    updateResultCopyLabel();
 }
 
 void ForensicWindow::pauseSelectedJob()
@@ -886,20 +904,43 @@ void ForensicWindow::setRevealPasswords(bool on)
 {
     m_revealPasswords = on;
     refreshResults();
+    // Apply the same visibility policy to the Jobs table's recovered column.
+    for (int r = 0; r < m_jobsTable->rowCount(); ++r) {
+        QTableWidgetItem *item = m_jobsTable->item(r, 11);
+        if (!item)
+            continue;
+        const QString value = item->data(Qt::UserRole).toString();
+        if (!value.isEmpty())
+            item->setText(on ? value : QStringLiteral("••••••"));
+    }
 }
 
-void ForensicWindow::copySelectedPassword()
+void ForensicWindow::updateResultCopyLabel()
 {
-    const int r = m_resultsTable->currentRow();
-    if (r < 0 || !m_resultsTable->item(r, 1))
+    if (!m_copyValueButton)
         return;
-    QApplication::clipboard()->setText(m_resultsTable->item(r, 1)->data(Qt::UserRole).toString());
+    const int r = m_resultsTable->currentRow();
+    QString label = tr("Copy Value");
+    if (r >= 0 && m_resultsTable->item(r, 2)) {
+        const auto kind = static_cast<forensic::ResultKind>(
+            m_resultsTable->item(r, 2)->data(Qt::UserRole + 1).toInt());
+        label = (kind == forensic::ResultKind::Password) ? tr("Copy Password") : tr("Copy Key");
+    }
+    m_copyValueButton->setText(label);
 }
 
-void ForensicWindow::copySelectedHash()
+void ForensicWindow::copySelectedValue()
 {
     const int r = m_resultsTable->currentRow();
     if (r < 0 || !m_resultsTable->item(r, 2))
         return;
     QApplication::clipboard()->setText(m_resultsTable->item(r, 2)->data(Qt::UserRole).toString());
+}
+
+void ForensicWindow::copySelectedTarget()
+{
+    const int r = m_resultsTable->currentRow();
+    if (r < 0 || !m_resultsTable->item(r, 3))
+        return;
+    QApplication::clipboard()->setText(m_resultsTable->item(r, 3)->data(Qt::UserRole).toString());
 }

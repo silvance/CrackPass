@@ -55,9 +55,10 @@ private slots:
     void generateReportForSelectedJob();
     void openForensicSettings();
     void openDependencyDoctor();
-    void copySelectedPassword();
-    void copySelectedHash();
+    void copySelectedValue();
+    void copySelectedTarget();
     void setRevealPasswords(bool on);
+    void updateResultCopyLabel();
 
 private:
     void refreshCaseHeader();
@@ -91,6 +92,7 @@ private:
     QTabWidget *m_tabs = nullptr;
     QTableWidget *m_jobsTable = nullptr;
     QTableWidget *m_resultsTable = nullptr;
+    QPushButton *m_copyValueButton = nullptr;
     bool m_revealPasswords = false;
 };
 
