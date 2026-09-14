@@ -48,9 +48,11 @@
 #include <QStandardPaths>
 #include <QFileInfo>
 #include <QHBoxLayout>
+#include <QMenu>
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QToolBar>
+#include <QToolButton>
 #include <QDateTime>
 #include <QCheckBox>
 #include <QClipboard>
@@ -165,8 +167,25 @@ ForensicWindow::ForensicWindow(QWidget *parent)
     QAction *recoverAction = toolbar->addAction(tr("Recover Password..."));
     recoverAction->setToolTip(tr("Recover the selected artifact's password (extracts the hash if needed)"));
     connect(recoverAction, &QAction::triggered, this, &ForensicWindow::recoverPasswordSelected);
-    connect(toolbar->addAction(tr("Extract Hash")), &QAction::triggered, this, &ForensicWindow::extractSelected);
-    connect(toolbar->addAction(tr("Plan Attack...")), &QAction::triggered, this, &ForensicWindow::planAttackSelected);
+
+    // The manual/technical and specialized actions live behind an "Advanced"
+    // menu so the primary toolbar stays focused on the recovery workflow. The
+    // actions are created once and reused by the evidence tab's Advanced menu.
+    m_extractAction = new QAction(tr("Extract Hash"), this);
+    m_extractAction->setToolTip(tr("Manually extract the hash from the selected artifact"));
+    connect(m_extractAction, &QAction::triggered, this, &ForensicWindow::extractSelected);
+    m_planAction = new QAction(tr("Plan Attack..."), this);
+    m_planAction->setToolTip(tr("Open the guided planner (case knowledge, every attack template)"));
+    connect(m_planAction, &QAction::triggered, this, &ForensicWindow::planAttackSelected);
+    m_bkcrackAction = new QAction(tr("ZipCrypto (bkcrack) Attack..."), this);
+    m_bkcrackAction->setToolTip(tr("Known-plaintext attack (bkcrack) on a legacy ZipCrypto archive"));
+    connect(m_bkcrackAction, &QAction::triggered, this, &ForensicWindow::zipCryptoAttackSelected);
+
+    auto *advToolButton = new QToolButton(this);
+    advToolButton->setText(tr("Advanced"));
+    advToolButton->setPopupMode(QToolButton::InstantPopup);
+    advToolButton->setMenu(buildAdvancedMenu(advToolButton));
+    toolbar->addWidget(advToolButton);
     toolbar->addSeparator();
     connect(toolbar->addAction(tr("Settings...")), &QAction::triggered, this, &ForensicWindow::openForensicSettings);
     connect(toolbar->addAction(tr("Tool Status...")), &QAction::triggered, this, &ForensicWindow::openDependencyDoctor);
@@ -272,21 +291,18 @@ QWidget *ForensicWindow::buildEvidenceTab()
     m_addButton = new QPushButton(tr("Add Artifact..."), w);
     connect(m_addButton, &QPushButton::clicked, this, &ForensicWindow::addArtifact);
     buttonRow->addWidget(m_addButton);
-    auto *recoverButton = new QPushButton(tr("Recover Password..."), w);
-    recoverButton->setDefault(true);
-    recoverButton->setToolTip(tr("The primary workflow: extract the hash if needed, then run a recovery"));
-    connect(recoverButton, &QPushButton::clicked, this, &ForensicWindow::recoverPasswordSelected);
-    buttonRow->addWidget(recoverButton);
-    m_extractButton = new QPushButton(tr("Extract Hash"), w);
-    connect(m_extractButton, &QPushButton::clicked, this, &ForensicWindow::extractSelected);
-    buttonRow->addWidget(m_extractButton);
-    m_planButton = new QPushButton(tr("Plan Attack..."), w);
-    connect(m_planButton, &QPushButton::clicked, this, &ForensicWindow::planAttackSelected);
-    buttonRow->addWidget(m_planButton);
-    m_bkcrackButton = new QPushButton(tr("ZipCrypto Attack..."), w);
-    m_bkcrackButton->setToolTip(tr("Known-plaintext attack (bkcrack) on a legacy ZipCrypto archive"));
-    connect(m_bkcrackButton, &QPushButton::clicked, this, &ForensicWindow::zipCryptoAttackSelected);
-    buttonRow->addWidget(m_bkcrackButton);
+    m_recoverButton = new QPushButton(tr("Recover Password..."), w);
+    m_recoverButton->setDefault(true);
+    m_recoverButton->setToolTip(tr("The primary workflow: extract the hash if needed, then run a recovery"));
+    connect(m_recoverButton, &QPushButton::clicked, this, &ForensicWindow::recoverPasswordSelected);
+    buttonRow->addWidget(m_recoverButton);
+    // Manual/technical and specialized actions are behind an "Advanced" menu so
+    // they stay available without cluttering the primary row.
+    auto *advButton = new QToolButton(w);
+    advButton->setText(tr("Advanced"));
+    advButton->setPopupMode(QToolButton::InstantPopup);
+    advButton->setMenu(buildAdvancedMenu(advButton));
+    buttonRow->addWidget(advButton);
     buttonRow->addStretch();
     layout->addLayout(buttonRow);
 
@@ -377,12 +393,26 @@ QWidget *ForensicWindow::buildResultsTab()
     return w;
 }
 
+QMenu *ForensicWindow::buildAdvancedMenu(QWidget *parent)
+{
+    // The shared actions may appear in more than one menu (toolbar + evidence
+    // tab); a QAction supports being placed in several menus at once.
+    auto *menu = new QMenu(parent);
+    menu->addAction(m_extractAction);
+    menu->addAction(m_planAction);
+    menu->addSeparator();
+    auto *specialized = menu->addMenu(tr("Specialized Recovery"));
+    specialized->addAction(m_bkcrackAction);
+    return menu;
+}
+
 void ForensicWindow::setCaseActionsEnabled(bool enabled)
 {
     m_addButton->setEnabled(enabled);
-    m_extractButton->setEnabled(enabled);
-    m_planButton->setEnabled(enabled);
-    m_bkcrackButton->setEnabled(enabled);
+    m_recoverButton->setEnabled(enabled);
+    m_extractAction->setEnabled(enabled);
+    m_planAction->setEnabled(enabled);
+    m_bkcrackAction->setEnabled(enabled);
 }
 
 void ForensicWindow::updateWelcomeVisibility()
