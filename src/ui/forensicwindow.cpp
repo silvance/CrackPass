@@ -789,7 +789,7 @@ void ForensicWindow::recoverPasswordSelected()
         return;
 
     m_recovery->queueRecoveryJob(dlg.plannedSpec(), item.id, toolPath, toolVersion,
-                                 dlg.plannedEngineId());
+                                 dlg.plannedEngineId(), dlg.chosenDictionary());
     m_tabs->setCurrentIndex(1); // show the Jobs tab
 }
 

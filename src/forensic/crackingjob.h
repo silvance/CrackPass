@@ -29,6 +29,25 @@ enum class JobState {
 QString jobStateToString(JobState state);
 JobState jobStateFromString(const QString &s);
 
+// Provenance of the managed dictionary used by a Dictionary attack, recorded on
+// the job so a report can name exactly which wordlist ran and so drift can be
+// detected later. Empty id means no managed dictionary was used (e.g. a mask
+// attack, or an ad-hoc wordlist). Records written before this field existed load
+// with an empty (unset) provenance.
+struct DictionaryProvenance
+{
+    QString id;             // stable library id, e.g. "casekey-common"
+    QString displayName;
+    QString path;           // the wordlist file used
+    QString sha256;         // recorded SHA-256 at the time the job ran
+    qint64 candidateCount = -1;
+
+    bool isSet() const { return !id.isEmpty(); }
+
+    QJsonObject toJson() const;
+    static DictionaryProvenance fromJson(const QJsonObject &obj);
+};
+
 // Snapshot of a compute device recorded at job time (for reproducibility).
 struct ComputeDevice
 {
@@ -73,6 +92,7 @@ struct CrackingJob
     QStringList wordlists;     // wordlists used (for reporting)
     QStringList rules;         // rule files used
     QString mask;              // mask used (a=3/6/7)
+    DictionaryProvenance dictionary; // managed dictionary used, if any
     QVector<ComputeDevice> devices;
 
     QDateTime startedUtc;

@@ -60,6 +60,14 @@ struct RecoveryReport
     QString mask;
     QStringList engineArgs; // exact parameters passed to the engine
 
+    // Managed dictionary used (Dictionary attack only; empty otherwise). Records
+    // exactly which wordlist ran, so the result can be reproduced and audited.
+    QString dictionaryId;
+    QString dictionaryName;
+    QString dictionaryPath;
+    QString dictionarySha256;
+    qint64  dictionaryCandidateCount = -1;
+
     // Timing / outcome
     QString startedUtc;
     QString endedUtc;

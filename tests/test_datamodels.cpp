@@ -22,6 +22,7 @@ class TestDataModels : public QObject
 private slots:
     void crackingJobRoundTrip();
     void legacyHashcatJobLoads();
+    void dictionaryProvenanceRoundTrip();
     void recoveredCredentialRoundTrip();
     void legacyCredentialIsPassword();
     void nonUtf8CredentialRoundTrip();
@@ -90,6 +91,39 @@ void TestDataModels::legacyHashcatJobLoads()
     QCOMPARE(j.enginePath, QStringLiteral("/usr/bin/hashcat"));
     QCOMPARE(j.engineVersion, QStringLiteral("v6.2.6"));
     QCOMPARE(j.engineArgs, (QStringList{QStringLiteral("-m"), QStringLiteral("13400")}));
+}
+
+void TestDataModels::dictionaryProvenanceRoundTrip()
+{
+    // A job with a managed dictionary records its provenance and round-trips it.
+    CrackingJob j;
+    j.id = QUuid::createUuid();
+    j.caseId = "case-dict";
+    j.engineId = "hashcat";
+    j.hashMode = 9600;
+    j.dictionary.id = "casekey-common";
+    j.dictionary.displayName = "CaseKey Common";
+    j.dictionary.path = "/dicts/casekey-common.txt";
+    j.dictionary.sha256 = QString(64, QLatin1Char('a'));
+    j.dictionary.candidateCount = 14344391;
+
+    const QJsonObject obj = j.toJson();
+    QVERIFY(obj.contains(QStringLiteral("dictionary")));
+    const CrackingJob back = CrackingJob::fromJson(obj);
+    QVERIFY(back.dictionary.isSet());
+    QCOMPARE(back.dictionary.id, QStringLiteral("casekey-common"));
+    QCOMPARE(back.dictionary.displayName, QStringLiteral("CaseKey Common"));
+    QCOMPARE(back.dictionary.path, QStringLiteral("/dicts/casekey-common.txt"));
+    QCOMPARE(back.dictionary.sha256.size(), 64);
+    QCOMPARE(back.dictionary.candidateCount, qint64(14344391));
+
+    // A job with no managed dictionary omits the field entirely and loads unset.
+    CrackingJob mask;
+    mask.id = QUuid::createUuid();
+    mask.engineId = "hashcat";
+    const QJsonObject maskObj = mask.toJson();
+    QVERIFY(!maskObj.contains(QStringLiteral("dictionary")));
+    QVERIFY(!CrackingJob::fromJson(maskObj).dictionary.isSet());
 }
 
 void TestDataModels::recoveredCredentialRoundTrip()

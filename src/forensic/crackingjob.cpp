@@ -36,6 +36,30 @@ JobState jobStateFromString(const QString &s)
     return JobState::Pending;
 }
 
+QJsonObject DictionaryProvenance::toJson() const
+{
+    QJsonObject o;
+    o[QStringLiteral("id")] = id;
+    o[QStringLiteral("displayName")] = displayName;
+    o[QStringLiteral("path")] = path;
+    o[QStringLiteral("sha256")] = sha256;
+    o[QStringLiteral("candidateCount")] = static_cast<double>(candidateCount);
+    return o;
+}
+
+DictionaryProvenance DictionaryProvenance::fromJson(const QJsonObject &obj)
+{
+    DictionaryProvenance p;
+    p.id = obj.value(QStringLiteral("id")).toString();
+    p.displayName = obj.value(QStringLiteral("displayName")).toString();
+    p.path = obj.value(QStringLiteral("path")).toString();
+    p.sha256 = obj.value(QStringLiteral("sha256")).toString();
+    p.candidateCount = obj.contains(QStringLiteral("candidateCount"))
+        ? static_cast<qint64>(obj.value(QStringLiteral("candidateCount")).toDouble(-1))
+        : -1;
+    return p;
+}
+
 QJsonObject ComputeDevice::toJson() const
 {
     QJsonObject obj;
@@ -89,6 +113,8 @@ QJsonObject CrackingJob::toJson() const
     obj[QStringLiteral("mask")] = mask;
     { QJsonArray a; for (const QString &w : wordlists) a.append(w); obj[QStringLiteral("wordlists")] = a; }
     { QJsonArray a; for (const QString &r : rules) a.append(r); obj[QStringLiteral("rules")] = a; }
+    if (dictionary.isSet())
+        obj[QStringLiteral("dictionary")] = dictionary.toJson();
     obj[QStringLiteral("devices")] = devArray;
     obj[QStringLiteral("startedUtc")] = jsonutil::fromDateTime(startedUtc);
     obj[QStringLiteral("endedUtc")] = jsonutil::fromDateTime(endedUtc);
@@ -128,6 +154,8 @@ CrackingJob CrackingJob::fromJson(const QJsonObject &obj)
     j.mask = obj.value(QStringLiteral("mask")).toString();
     for (const QJsonValue &v : obj.value(QStringLiteral("wordlists")).toArray()) j.wordlists.append(v.toString());
     for (const QJsonValue &v : obj.value(QStringLiteral("rules")).toArray()) j.rules.append(v.toString());
+    if (obj.contains(QStringLiteral("dictionary")))
+        j.dictionary = DictionaryProvenance::fromJson(obj.value(QStringLiteral("dictionary")).toObject());
     for (const QJsonValue &v : obj.value(QStringLiteral("devices")).toArray())
         j.devices.append(ComputeDevice::fromJson(v.toObject()));
     j.startedUtc = jsonutil::toDateTime(obj.value(QStringLiteral("startedUtc")).toString());

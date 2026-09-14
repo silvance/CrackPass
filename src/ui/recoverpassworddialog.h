@@ -5,6 +5,7 @@
 #ifndef UI_RECOVERPASSWORDDIALOG_H
 #define UI_RECOVERPASSWORDDIALOG_H
 
+#include "forensic/crackingjob.h"
 #include "forensic/dictionary/dictionarylibrary.h"
 #include "forensic/planner/attackjobspec.h"
 #include "forensic/recovery/recoveryengineregistry.h"
@@ -53,9 +54,10 @@ public:
 
     forensic::AttackJobSpec plannedSpec() const { return m_spec; }
     QString plannedEngineId() const { return m_engineId; }
-    // The chosen dictionary (Dictionary strategy only); id empty otherwise. Kept
-    // for job/report provenance wiring.
-    QString chosenDictionaryId() const { return m_dictionaryId; }
+    // The chosen dictionary's provenance (Dictionary strategy only; unset id
+    // otherwise), for stamping onto the job and report. Its SHA-256 is the digest
+    // computed at Start, after the drift check passed.
+    forensic::DictionaryProvenance chosenDictionary() const { return m_dictionaryProvenance; }
 
 private slots:
     void strategyChanged();
@@ -89,6 +91,7 @@ private:
     forensic::AttackJobSpec m_spec;
     QString m_engineId;
     QString m_dictionaryId;
+    forensic::DictionaryProvenance m_dictionaryProvenance; // filled at Start
     bool m_planOk = false; // a runnable plan with an engine that can express it
 
     bool m_startRequested = false;
