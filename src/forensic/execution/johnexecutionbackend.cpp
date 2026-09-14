@@ -6,6 +6,7 @@
 
 #include "crackedplain.h"
 #include "hashcatstatus.h"
+#include "processcontrol.h"
 
 #include <QFile>
 #include <QProcess>
@@ -152,6 +153,7 @@ void JohnExecutionBackend::launch(const QUuid &jobId, bool restore)
 
     auto *proc = new QProcess(this);
     ctx->proc = proc;
+    configureForGracefulStop(proc); // Windows: own process group for CTRL_BREAK
     if (!ctx->opts.workingDir.isEmpty())
         proc->setWorkingDirectory(ctx->opts.workingDir);
     // Run the binary recorded on the job so the executed process matches the
@@ -260,10 +262,11 @@ void JohnExecutionBackend::requestShutdown(const QUuid &jobId, Pending kind)
     if (!ctx || !ctx->proc)
         return;
     ctx->pending = kind;
-    // Graceful first: john saves its session (.rec) on a terminate signal so the
-    // job can be resumed. Force-kill only if it does not exit within the grace
-    // period (no session save is guaranteed in that forced case).
-    ctx->proc->terminate();
+    // Graceful first (SIGTERM on POSIX, console CTRL_BREAK on Windows): john
+    // saves its session (.rec) on that signal so the job can be resumed.
+    // Force-kill only if it does not exit within the grace period (no session
+    // save is guaranteed in that forced case).
+    requestGracefulStop(ctx->proc);
     QProcess *proc = ctx->proc;
     QTimer::singleShot(kGraceMs, proc, [proc]() {
         if (proc->state() != QProcess::NotRunning)
