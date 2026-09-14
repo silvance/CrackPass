@@ -187,6 +187,10 @@ void JobQueue::onCracked(const QUuid &jobId, const QString &hash, const QByteArr
     cred.caseId = m_jobs.at(i).caseId;
     cred.jobId = jobId;
     cred.evidenceId = m_jobs.at(i).evidenceId;
+    // Record which engine produced this result and what kind of secret it is
+    // (a password, or key material for bkcrack) so the UI/report label it right.
+    cred.engineId = m_jobs.at(i).engineId;
+    cred.kind = resultKindForEngine(m_jobs.at(i).engineId);
     cred.hash = hash;
     cred.plaintext = decoded.display;
     cred.rawPlaintext = decoded.raw;

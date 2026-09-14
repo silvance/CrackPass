@@ -7,6 +7,47 @@
 
 namespace forensic {
 
+QString resultKindToString(ResultKind kind)
+{
+    switch (kind) {
+    case ResultKind::Password:      return QStringLiteral("password");
+    case ResultKind::EncryptionKey: return QStringLiteral("encryption-key");
+    case ResultKind::InternalKey:   return QStringLiteral("internal-key");
+    case ResultKind::RecoveryKey:   return QStringLiteral("recovery-key");
+    case ResultKind::Other:         return QStringLiteral("other");
+    }
+    return QStringLiteral("password");
+}
+
+ResultKind resultKindFromString(const QString &s)
+{
+    if (s == QStringLiteral("encryption-key")) return ResultKind::EncryptionKey;
+    if (s == QStringLiteral("internal-key"))   return ResultKind::InternalKey;
+    if (s == QStringLiteral("recovery-key"))   return ResultKind::RecoveryKey;
+    if (s == QStringLiteral("other"))          return ResultKind::Other;
+    return ResultKind::Password; // default / legacy
+}
+
+QString resultKindNoun(ResultKind kind)
+{
+    switch (kind) {
+    case ResultKind::Password:      return QStringLiteral("password");
+    case ResultKind::EncryptionKey: return QStringLiteral("encryption key");
+    case ResultKind::InternalKey:   return QStringLiteral("key material");
+    case ResultKind::RecoveryKey:   return QStringLiteral("recovery key");
+    case ResultKind::Other:         return QStringLiteral("secret");
+    }
+    return QStringLiteral("password");
+}
+
+ResultKind resultKindForEngine(const QString &engineId)
+{
+    // bkcrack recovers the ZipCrypto internal key triple, not a password.
+    if (engineId == QStringLiteral("bkcrack"))
+        return ResultKind::InternalKey;
+    return ResultKind::Password;
+}
+
 QJsonObject RecoveredCredential::toJson() const
 {
     QJsonObject obj;
@@ -14,6 +55,8 @@ QJsonObject RecoveredCredential::toJson() const
     obj[QStringLiteral("caseId")] = caseId;
     obj[QStringLiteral("jobId")] = jobId.toString(QUuid::WithoutBraces);
     obj[QStringLiteral("evidenceId")] = evidenceId.toString(QUuid::WithoutBraces);
+    obj[QStringLiteral("engineId")] = engineId;
+    obj[QStringLiteral("kind")] = resultKindToString(kind);
     obj[QStringLiteral("hash")] = hash;
     obj[QStringLiteral("plaintext")] = plaintext;
     // Store the exact recovered bytes as hex so no fidelity is lost through JSON
@@ -33,6 +76,11 @@ RecoveredCredential RecoveredCredential::fromJson(const QJsonObject &obj)
     c.caseId = obj.value(QStringLiteral("caseId")).toString();
     c.jobId = QUuid::fromString(obj.value(QStringLiteral("jobId")).toString());
     c.evidenceId = QUuid::fromString(obj.value(QStringLiteral("evidenceId")).toString());
+    c.engineId = obj.value(QStringLiteral("engineId")).toString();
+    // Records written before result kinds existed are recovered passwords.
+    c.kind = obj.contains(QStringLiteral("kind"))
+        ? resultKindFromString(obj.value(QStringLiteral("kind")).toString())
+        : ResultKind::Password;
     c.hash = obj.value(QStringLiteral("hash")).toString();
     c.plaintext = obj.value(QStringLiteral("plaintext")).toString();
     if (obj.contains(QStringLiteral("rawHex")))
