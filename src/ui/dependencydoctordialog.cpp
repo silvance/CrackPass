@@ -134,7 +134,7 @@ void DependencyDoctorDialog::rescan()
     // resources
     auto *res = new QTreeWidgetItem(m_tree);
     res->setText(0, tr("Resources"));
-    kv(res, tr("Common wordlist"),
+    kv(res, tr("Legacy default wordlist"),
        rep.resources.commonWordlist.isEmpty()
            ? tr("(not set)")
            : QStringLiteral("%1 (%2)").arg(rep.resources.commonWordlist,

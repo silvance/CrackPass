@@ -43,7 +43,11 @@ ForensicSettingsDialog::ForensicSettingsDialog(QWidget *parent)
 
     auto *res = new QGroupBox(tr("Resources"), this);
     auto *rf = new QFormLayout(res);
-    addPathRow(rf, tr("Common-passwords wordlist"), QStringLiteral("commonWordlist"), false);
+    // Legacy/advanced default only: the normal dictionary is the managed
+    // library (Settings -> Dictionaries / the Recover Password workflow). This
+    // path merely prefills the Advanced planner's external-wordlist field and is
+    // kept so older settings keep working. The settings key stays "commonWordlist".
+    addPathRow(rf, tr("Legacy default wordlist (advanced)"), QStringLiteral("commonWordlist"), false);
     addPathRow(rf, tr("Rules directory"), QStringLiteral("rulesDir"), true);
     addPathRow(rf, tr("Default case location"), QStringLiteral("caseRoot"), true);
     root->addWidget(res);
